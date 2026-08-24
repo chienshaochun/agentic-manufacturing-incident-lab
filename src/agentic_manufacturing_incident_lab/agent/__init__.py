@@ -9,6 +9,7 @@ from agentic_manufacturing_incident_lab.agent.contracts import (
     StopDecision,
     StopReason,
 )
+from agentic_manufacturing_incident_lab.agent.rule_based import RuleBasedPlanner
 
 __all__ = [
     "ActionDecision",
@@ -16,6 +17,7 @@ __all__ = [
     "CompleteDecision",
     "PlanningDecision",
     "PlanningPolicy",
+    "RuleBasedPlanner",
     "StopDecision",
     "StopReason",
 ]

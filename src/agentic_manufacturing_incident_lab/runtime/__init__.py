@@ -4,5 +4,6 @@ from agentic_manufacturing_incident_lab.runtime.executor import (
     ActionExecutionRecord,
     ActionExecutor,
 )
+from agentic_manufacturing_incident_lab.runtime.run import InvestigationRun
 
-__all__ = ["ActionExecutionRecord", "ActionExecutor"]
+__all__ = ["ActionExecutionRecord", "ActionExecutor", "InvestigationRun"]

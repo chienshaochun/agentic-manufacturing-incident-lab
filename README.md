@@ -38,11 +38,11 @@
 - 故障注入、評估指標與完整追蹤紀錄
 - Streamlit 操作介面與事件調查報告
 
-詳細邊界與驗收條件見 [產品契約](docs/PRODUCT_CONTRACT.md)，逐步實作方式見 [學習路線圖](docs/LEARNING_ROADMAP.md)，Phase 1 的資料關係見 [領域模型](docs/DOMAIN_MODEL.md)，Phase 2 的執行架構見 [模擬環境與工具系統](docs/PHASE_2_SIMULATOR_AND_TOOLS.md)。
+詳細邊界與驗收條件見 [產品契約](docs/PRODUCT_CONTRACT.md)，逐步實作方式見 [學習路線圖](docs/LEARNING_ROADMAP.md)，Phase 1 的資料關係見 [領域模型](docs/DOMAIN_MODEL.md)，Phase 2 的執行架構見 [模擬環境與工具系統](docs/PHASE_2_SIMULATOR_AND_TOOLS.md)，Phase 3 的決策流程見 [單一 Agent 決策循環](docs/PHASE_3_SINGLE_AGENT_LOOP.md)。
 
 ## 目前進度
 
-Phase 2 已完成：專案已具備可重播的合成情境、模擬環境、工具白名單、診斷工具、執行紀錄與固定 SOP baseline。Phase 3 將加入能根據 Observation 動態選擇 Action 的單 Agent。
+Phase 3 已完成：系統具備可替換的 Planner 契約、確定性 RuleBasedPlanner，以及能依工具結果重新規劃、完成或安全停止的單 Agent 決策循環。下一階段將加入任務記憶、正式 step budget 與可恢復 checkpoint。
 
 ## 本機手動演練
 
@@ -63,6 +63,7 @@ python examples\scenario_preview.py
 python examples\environment_walkthrough.py
 python examples\tool_execution_walkthrough.py
 python examples\baseline_workflow.py
+python examples\single_agent_walkthrough.py
 python -m pytest
 ```
 

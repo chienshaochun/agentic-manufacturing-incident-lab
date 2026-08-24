@@ -42,7 +42,7 @@
 
 ## 目前進度
 
-Phase 1 已完成：事件、動作、執行結果、觀察、證據與任務狀態已具備不可變資料模型及測試。Agent 執行循環將在模擬工具完成後加入。
+Phase 2 進行中：Phase 1 的不可變領域模型已完成，目前正在建立可重播的合成情境與模擬工具。Agent 執行循環將在模擬工具完成後加入。
 
 ## Phase 1 手動演練
 
@@ -59,6 +59,7 @@ python -m pip install -e ".[dev]"
 
 ```powershell
 python examples\domain_walkthrough.py
+python examples\scenario_preview.py
 python -m pytest
 ```
 

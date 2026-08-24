@@ -1,10 +1,16 @@
 """Immutable aggregate for one investigation's states, executions, and evidence."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from agentic_manufacturing_incident_lab.domain.models import Evidence, Incident, Observation
 from agentic_manufacturing_incident_lab.domain.task import TaskState, TaskStatus
 from agentic_manufacturing_incident_lab.runtime.executor import ActionExecutionRecord
+
+if TYPE_CHECKING:
+    from agentic_manufacturing_incident_lab.agent.memory import WorkingMemory
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,11 +21,13 @@ class InvestigationRun:
     task_states: tuple[TaskState, ...]
     executions: tuple[ActionExecutionRecord, ...] = ()
     evidence: tuple[Evidence, ...] = ()
+    memory_states: tuple[WorkingMemory, ...] = ()
 
     def __post_init__(self) -> None:
         task_states = tuple(self.task_states)
         executions = tuple(self.executions)
         evidence = tuple(self.evidence)
+        memory_states = tuple(self.memory_states)
         if not task_states:
             raise ValueError("task_states must contain at least one state")
         if task_states[0].status is not TaskStatus.CREATED:
@@ -67,9 +75,45 @@ class InvestigationRun:
         ):
             raise ValueError("evidence may only reference observations in the run")
 
+        if memory_states:
+            task_id = task_states[0].task_id
+            if any(memory.task_id != task_id for memory in memory_states):
+                raise ValueError("all memory states must match the run task")
+            if any(
+                memory.incident_id != self.incident.incident_id
+                for memory in memory_states
+            ):
+                raise ValueError("all memory states must match the run incident")
+            if tuple(memory.revision for memory in memory_states) != tuple(
+                range(len(memory_states))
+            ):
+                raise ValueError(
+                    "memory revisions must be contiguous and start at zero"
+                )
+            if any(
+                later.updated_at <= earlier.updated_at
+                for earlier, later in zip(memory_states, memory_states[1:])
+            ):
+                raise ValueError("memory state timestamps must move forward")
+            action_limits = {memory.step_budget.action_limit for memory in memory_states}
+            if len(action_limits) != 1:
+                raise ValueError("memory states must preserve one action_limit")
+            if memory_states[-1].step_budget.actions_used != len(executions):
+                raise ValueError("final memory actions_used must match run executions")
+            if any(
+                not set(memory.referenced_observation_ids).issubset(
+                    known_observation_ids
+                )
+                for memory in memory_states
+            ):
+                raise ValueError(
+                    "memory facts may only reference observations in the run"
+                )
+
         object.__setattr__(self, "task_states", task_states)
         object.__setattr__(self, "executions", executions)
         object.__setattr__(self, "evidence", evidence)
+        object.__setattr__(self, "memory_states", memory_states)
 
     @property
     def final_state(self) -> TaskState:
@@ -82,3 +126,8 @@ class InvestigationRun:
         return tuple(
             observation for record in self.executions for observation in record.observations
         )
+
+    @property
+    def final_memory(self) -> WorkingMemory | None:
+        """Return the latest working-memory snapshot when the run uses memory."""
+        return self.memory_states[-1] if self.memory_states else None

@@ -169,7 +169,7 @@ def test_agent_rejects_completion_with_unknown_observation_reference() -> None:
     assert "were not collected" in run.final_state.reason
 
 
-def test_hard_safety_limit_stops_a_nonterminating_policy() -> None:
+def test_step_budget_stops_a_nonterminating_policy() -> None:
     class RepeatingPolicy:
         name = "repeating_test"
 
@@ -185,12 +185,14 @@ def test_hard_safety_limit_stops_a_nonterminating_policy() -> None:
     run = SingleAgentRunner(
         policy=RepeatingPolicy(),
         registry=build_diagnostic_registry(environment),
-        safety_action_limit=2,
+        action_limit=2,
     ).run(incident=brief.incident, known_asset_ids=brief.known_asset_ids)
 
     assert run.final_state.status is TaskStatus.SAFE_STOPPED
     assert len(run.executions) == 2
-    assert "Hard safety action limit" in run.final_state.reason
+    assert "Step budget exhausted" in run.final_state.reason
+    assert run.final_memory is not None
+    assert run.final_memory.step_budget.is_exhausted
 
 
 def test_same_scenario_and_policy_replay_identical_agent_run() -> None:
@@ -198,12 +200,28 @@ def test_same_scenario_and_policy_replay_identical_agent_run() -> None:
 
 
 @pytest.mark.parametrize("invalid_limit", [0, -1, True, 1.5])
-def test_agent_requires_positive_integer_safety_limit(invalid_limit: object) -> None:
+def test_agent_requires_positive_integer_action_limit(invalid_limit: object) -> None:
     environment = make_environment()
 
     with pytest.raises(ValueError, match="positive integer"):
         SingleAgentRunner(
             policy=RuleBasedPlanner(),
             registry=build_diagnostic_registry(environment),
-            safety_action_limit=invalid_limit,  # type: ignore[arg-type]
+            action_limit=invalid_limit,  # type: ignore[arg-type]
         )
+
+
+def test_agent_records_versioned_working_memory() -> None:
+    run = run_rule_based_agent()
+
+    assert run.final_memory is not None
+    assert [memory.revision for memory in run.memory_states] == list(
+        range(len(run.memory_states))
+    )
+    assert len(run.final_memory.facts) == 3
+    assert run.final_memory.open_questions == ()
+    assert run.final_memory.step_budget.actions_used == 3
+    assert run.final_memory.step_budget.actions_remaining == 29
+    assert run.final_memory.referenced_observation_ids == tuple(
+        observation.observation_id for observation in run.observations
+    )

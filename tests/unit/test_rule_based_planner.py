@@ -7,8 +7,10 @@ from agentic_manufacturing_incident_lab.agent import (
     CompleteDecision,
     PlanningPolicy,
     RuleBasedPlanner,
+    StepBudget,
     StopDecision,
     StopReason,
+    WorkingMemory,
 )
 from agentic_manufacturing_incident_lab.domain.models import Action, ActionRisk
 from agentic_manufacturing_incident_lab.domain.task import TaskState, TaskStatus
@@ -67,6 +69,10 @@ def make_context(
 ) -> AgentContext:
     brief = environment.brief
     incident = brief.incident
+    updated_at = max(
+        (record.result.completed_at for record in executions),
+        default=incident.reported_at + timedelta(seconds=1),
+    )
     return AgentContext(
         incident=incident,
         known_asset_ids=known_asset_ids or brief.known_asset_ids,
@@ -79,6 +85,18 @@ def make_context(
             reason="Investigation started.",
         ),
         available_tools=registry.specs,
+        working_memory=WorkingMemory(
+            task_id="TASK-001",
+            incident_id=incident.incident_id,
+            revision=0,
+            facts=(),
+            open_questions=(),
+            step_budget=StepBudget(
+                action_limit=10,
+                actions_used=len(executions),
+            ),
+            updated_at=updated_at,
+        ),
         executions=executions,
     )
 

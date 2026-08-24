@@ -62,6 +62,26 @@ def main() -> None:
         print(f"  confidence: {evidence.confidence:.2f}")
         print(f"  observations: {', '.join(evidence.observation_ids)}")
 
+    print("Working memory:")
+    memory = run.final_memory
+    if memory is None:
+        print("- none")
+        return
+    print(f"- revision: {memory.revision}")
+    print(
+        f"- action budget: used={memory.step_budget.actions_used} "
+        f"remaining={memory.step_budget.actions_remaining} "
+        f"limit={memory.step_budget.action_limit}"
+    )
+    print("- facts:")
+    for fact in memory.facts:
+        print(f"  - {fact.statement} [{', '.join(fact.observation_ids)}]")
+    print("- open questions:")
+    if not memory.open_questions:
+        print("  - none")
+    for question in memory.open_questions:
+        print(f"  - {question.prompt}")
+
 
 if __name__ == "__main__":
     main()

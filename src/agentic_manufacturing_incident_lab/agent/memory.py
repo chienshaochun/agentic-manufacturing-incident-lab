@@ -1,5 +1,7 @@
 """Immutable working-memory records for resumable agent investigations."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, replace
 from datetime import datetime
 
@@ -9,7 +11,12 @@ from agentic_manufacturing_incident_lab.domain._validation import (
 )
 from agentic_manufacturing_incident_lab.domain.execution import ActionResultStatus
 from agentic_manufacturing_incident_lab.domain.models import Action, Incident
-from agentic_manufacturing_incident_lab.runtime.executor import ActionExecutionRecord
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from agentic_manufacturing_incident_lab.runtime.executor import (
+        ActionExecutionRecord,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,7 +95,7 @@ class StepBudget:
         """Return whether no additional action may be attempted."""
         return self.actions_remaining == 0
 
-    def consume(self) -> "StepBudget":
+    def consume(self) -> StepBudget:
         """Return a new budget after one action, rejecting over-consumption."""
         if self.is_exhausted:
             raise StepBudgetExceeded("step budget is exhausted")

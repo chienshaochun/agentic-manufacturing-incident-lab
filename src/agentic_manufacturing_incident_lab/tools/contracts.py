@@ -1,12 +1,13 @@
 """Immutable contracts shared by tool implementations and the registry."""
 
+import re
 from dataclasses import dataclass
 from enum import StrEnum
-import re
 from typing import Mapping, Protocol
 
 from agentic_manufacturing_incident_lab.domain._validation import require_text
 from agentic_manufacturing_incident_lab.domain.models import (
+    Action,
     ActionRisk,
     Observation,
     ScalarValue,
@@ -118,6 +119,6 @@ class Tool(Protocol):
 
     spec: ToolSpec
 
-    def invoke(self, parameters: Mapping[str, ScalarValue]) -> ToolResponse:
-        """Execute the tool using parameters already validated by the registry."""
+    def invoke(self, action: Action) -> ToolResponse:
+        """Execute one complete action after registry validation."""
         ...

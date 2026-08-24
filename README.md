@@ -61,6 +61,7 @@ python -m pip install -e ".[dev]"
 python examples\domain_walkthrough.py
 python examples\scenario_preview.py
 python examples\environment_walkthrough.py
+python examples\tool_execution_walkthrough.py
 python -m pytest
 ```
 

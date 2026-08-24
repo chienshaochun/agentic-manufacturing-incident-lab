@@ -22,9 +22,9 @@ class RecordingTool:
         self.spec = spec
         self.calls: list[dict[str, ScalarValue]] = []
 
-    def invoke(self, parameters: Mapping[str, ScalarValue]) -> ToolResponse:
-        self.calls.append(dict(parameters))
-        return ToolResponse(summary=f"Measured {parameters['asset_id']}.")
+    def invoke(self, action: Action) -> ToolResponse:
+        self.calls.append(dict(action.parameters))
+        return ToolResponse(summary=f"Measured {action.parameters['asset_id']}.")
 
 
 def make_spec(

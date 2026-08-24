@@ -52,7 +52,7 @@ class ToolRegistry:
                 f"action risk {action.risk} does not match registered risk {tool.spec.risk}"
             )
         tool.spec.validate_parameters(action.parameters)
-        return tool.invoke(action.parameters)
+        return tool.invoke(action)
 
     def _resolve(self, name: str) -> Tool:
         try:

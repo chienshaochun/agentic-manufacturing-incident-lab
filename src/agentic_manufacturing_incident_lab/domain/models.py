@@ -8,6 +8,11 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import Mapping, TypeAlias
 
+from agentic_manufacturing_incident_lab.domain._validation import (
+    require_text,
+    require_timezone,
+)
+
 ScalarValue: TypeAlias = str | int | float | bool | None
 
 
@@ -37,16 +42,6 @@ class ActionRisk(StrEnum):
     HIGH_IMPACT = "high_impact"
 
 
-def _require_text(value: str, field_name: str) -> None:
-    if not value.strip():
-        raise ValueError(f"{field_name} must not be blank")
-
-
-def _require_timezone(value: datetime, field_name: str) -> None:
-    if value.tzinfo is None or value.utcoffset() is None:
-        raise ValueError(f"{field_name} must include timezone information")
-
-
 @dataclass(frozen=True, slots=True)
 class Incident:
     """A reported problem and its investigation goal, not a proven cause."""
@@ -61,8 +56,8 @@ class Incident:
 
     def __post_init__(self) -> None:
         for field_name in ("incident_id", "title", "description", "asset_id", "goal"):
-            _require_text(getattr(self, field_name), field_name)
-        _require_timezone(self.reported_at, "reported_at")
+            require_text(getattr(self, field_name), field_name)
+        require_timezone(self.reported_at, "reported_at")
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,8 +74,8 @@ class Action:
 
     def __post_init__(self) -> None:
         for field_name in ("action_id", "incident_id", "tool_name", "rationale"):
-            _require_text(getattr(self, field_name), field_name)
-        _require_timezone(self.requested_at, "requested_at")
+            require_text(getattr(self, field_name), field_name)
+        require_timezone(self.requested_at, "requested_at")
         object.__setattr__(self, "parameters", MappingProxyType(dict(self.parameters)))
 
 
@@ -98,8 +93,8 @@ class Observation:
 
     def __post_init__(self) -> None:
         for field_name in ("observation_id", "incident_id", "source", "summary"):
-            _require_text(getattr(self, field_name), field_name)
-        _require_timezone(self.observed_at, "observed_at")
+            require_text(getattr(self, field_name), field_name)
+        require_timezone(self.observed_at, "observed_at")
         object.__setattr__(self, "values", MappingProxyType(dict(self.values)))
 
 
@@ -116,15 +111,15 @@ class Evidence:
 
     def __post_init__(self) -> None:
         for field_name in ("evidence_id", "incident_id", "claim"):
-            _require_text(getattr(self, field_name), field_name)
+            require_text(getattr(self, field_name), field_name)
         observation_ids = tuple(self.observation_ids)
         if not observation_ids:
             raise ValueError("observation_ids must contain at least one observation")
         for observation_id in observation_ids:
-            _require_text(observation_id, "observation_id")
+            require_text(observation_id, "observation_id")
         if len(set(observation_ids)) != len(observation_ids):
             raise ValueError("observation_ids must not contain duplicates")
         if isinstance(self.confidence, bool) or not 0.0 <= self.confidence <= 1.0:
             raise ValueError("confidence must be between 0.0 and 1.0")
-        _require_timezone(self.created_at, "created_at")
+        require_timezone(self.created_at, "created_at")
         object.__setattr__(self, "observation_ids", observation_ids)

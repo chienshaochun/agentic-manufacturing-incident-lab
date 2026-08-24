@@ -58,8 +58,10 @@ class SingleAgentRunner:
         *,
         incident: Incident,
         known_asset_ids: tuple[str, ...],
+        pause_after_actions: int | None = None,
     ) -> InvestigationRun:
-        """Investigate one incident and return its complete auditable record."""
+        """Start an investigation and optionally pause after a total action count."""
+        self._validate_pause_after_actions(pause_after_actions)
         created = TaskState(
             task_id=f"TASK-{incident.incident_id}",
             incident_id=incident.incident_id,
@@ -85,6 +87,60 @@ class SingleAgentRunner:
             )
         ]
 
+        return self._continue_run(
+            incident=incident,
+            known_asset_ids=known_asset_ids,
+            task_states=task_states,
+            executions=executions,
+            memory_states=memory_states,
+            pause_after_actions=pause_after_actions,
+        )
+
+    def resume(
+        self,
+        partial_run: InvestigationRun,
+        *,
+        known_asset_ids: tuple[str, ...],
+        pause_after_actions: int | None = None,
+    ) -> InvestigationRun:
+        """Continue one validated investigating run using the configured runtime."""
+        self._validate_pause_after_actions(pause_after_actions)
+        if partial_run.final_state.status is not TaskStatus.INVESTIGATING:
+            raise ValueError("only an investigating run can be resumed")
+        if partial_run.evidence:
+            raise ValueError("an investigating run cannot already contain evidence")
+        if partial_run.final_memory is None:
+            raise ValueError("a resumable run must contain working memory")
+        if partial_run.final_memory.step_budget.action_limit != self._action_limit:
+            raise ValueError("runner action_limit must match checkpoint memory")
+        expected_policy_reason = f"Planning policy {self._policy.name} started."
+        if (
+            len(partial_run.task_states) < 2
+            or partial_run.task_states[1].reason != expected_policy_reason
+        ):
+            raise ValueError("runner planning policy must match checkpoint policy")
+
+        return self._continue_run(
+            incident=partial_run.incident,
+            known_asset_ids=known_asset_ids,
+            task_states=list(partial_run.task_states),
+            executions=list(partial_run.executions),
+            memory_states=list(partial_run.memory_states),
+            pause_after_actions=pause_after_actions,
+        )
+
+    def _continue_run(
+        self,
+        *,
+        incident: Incident,
+        known_asset_ids: tuple[str, ...],
+        task_states: list[TaskState],
+        executions: list[ActionExecutionRecord],
+        memory_states: list[WorkingMemory],
+        pause_after_actions: int | None,
+    ) -> InvestigationRun:
+        """Continue the shared decision loop from fresh or restored state."""
+
         while True:
             context = AgentContext(
                 incident=incident,
@@ -94,6 +150,16 @@ class SingleAgentRunner:
                 working_memory=memory_states[-1],
                 executions=tuple(executions),
             )
+            if (
+                pause_after_actions is not None
+                and len(executions) >= pause_after_actions
+            ):
+                return self._snapshot_run(
+                    incident=incident,
+                    task_states=task_states,
+                    executions=executions,
+                    memory_states=memory_states,
+                )
             decision = self._policy.decide(context)
 
             if isinstance(decision, CompleteDecision):
@@ -164,6 +230,28 @@ class SingleAgentRunner:
             record = self._executor.execute(action)
             executions.append(record)
             memory_states.append(record_action_memory(memory_states[-1], record))
+
+    @staticmethod
+    def _snapshot_run(
+        *,
+        incident: Incident,
+        task_states: list[TaskState],
+        executions: list[ActionExecutionRecord],
+        memory_states: list[WorkingMemory],
+    ) -> InvestigationRun:
+        return InvestigationRun(
+            incident=incident,
+            task_states=tuple(task_states),
+            executions=tuple(executions),
+            memory_states=tuple(memory_states),
+        )
+
+    @staticmethod
+    def _validate_pause_after_actions(value: int | None) -> None:
+        if value is None:
+            return
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError("pause_after_actions must be a non-negative integer")
 
     @classmethod
     def _complete_run(

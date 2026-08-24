@@ -38,11 +38,31 @@
 - 故障注入、評估指標與完整追蹤紀錄
 - Streamlit 操作介面與事件調查報告
 
-詳細邊界與驗收條件見 [產品契約](docs/PRODUCT_CONTRACT.md)，逐步實作方式見 [學習路線圖](docs/LEARNING_ROADMAP.md)。
+詳細邊界與驗收條件見 [產品契約](docs/PRODUCT_CONTRACT.md)，逐步實作方式見 [學習路線圖](docs/LEARNING_ROADMAP.md)，Phase 1 的資料關係見 [領域模型](docs/DOMAIN_MODEL.md)。
 
 ## 目前進度
 
-Phase 0：已定義問題、系統邊界、驗收條件與教學路線；尚未開始撰寫 Agent 執行程式。
+Phase 1 已完成：事件、動作、執行結果、觀察、證據與任務狀態已具備不可變資料模型及測試。Agent 執行循環將在模擬工具完成後加入。
+
+## Phase 1 手動演練
+
+建立 Python 3.12 Conda 環境，並以 editable mode 安裝專案與開發依賴：
+
+```powershell
+cd agentic-manufacturing-incident-lab
+conda create -n agentic-lab python=3.12 -y
+conda activate agentic-lab
+python -m pip install -e ".[dev]"
+```
+
+執行完整領域流程與測試：
+
+```powershell
+python examples\domain_walkthrough.py
+python -m pytest
+```
+
+walkthrough 只會手動建立並串接 Phase 1 record，不會呼叫 LLM、網路、真實工具或設備。
 
 ## 技術原則
 
@@ -50,4 +70,3 @@ Phase 0：已定義問題、系統邊界、驗收條件與教學路線；尚未�
 - 先完成可預測、可測試的確定性核心，再考慮接入 LLM
 - 公開版本只使用合成資料，不含任何公司機密或真實製程參數
 - LLM 與本機模型屬於後續可替換元件，不是系統正確性的唯一來源
-

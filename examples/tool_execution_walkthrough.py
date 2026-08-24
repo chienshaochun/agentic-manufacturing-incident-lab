@@ -3,6 +3,7 @@
 from datetime import timedelta
 
 from agentic_manufacturing_incident_lab import Action, ActionRisk
+from agentic_manufacturing_incident_lab.runtime import ActionExecutor
 from agentic_manufacturing_incident_lab.simulation import (
     SimulatedEnvironment,
     build_station_connectivity_scenario,
@@ -15,6 +16,7 @@ def main() -> None:
     scenario = build_station_connectivity_scenario(seed=43)
     environment = SimulatedEnvironment(scenario)
     registry = build_diagnostic_registry(environment)
+    executor = ActionExecutor(registry)
     incident = environment.brief.incident
 
     actions = (
@@ -44,9 +46,12 @@ def main() -> None:
     print()
     print("Executed actions")
     for action in actions:
-        response = registry.execute(action)
-        observation = response.observations[0]
-        print(f"- {action.action_id} -> {observation.summary}")
+        record = executor.execute(action)
+        observation = record.observations[0]
+        print(
+            f"- {action.action_id} | result={record.result.status} "
+            f"| {observation.summary}"
+        )
 
 
 if __name__ == "__main__":

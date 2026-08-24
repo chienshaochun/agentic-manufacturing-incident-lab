@@ -16,6 +16,10 @@ from agentic_manufacturing_incident_lab.agent.memory import (
     StepBudget,
     StepBudgetExceeded,
     WorkingMemory,
+    complete_working_memory,
+    initialize_working_memory,
+    prepare_action_memory,
+    record_action_memory,
 )
 from agentic_manufacturing_incident_lab.agent.rule_based import RuleBasedPlanner
 
@@ -34,4 +38,8 @@ __all__ = [
     "StopDecision",
     "StopReason",
     "WorkingMemory",
+    "complete_working_memory",
+    "initialize_working_memory",
+    "prepare_action_memory",
+    "record_action_memory",
 ]

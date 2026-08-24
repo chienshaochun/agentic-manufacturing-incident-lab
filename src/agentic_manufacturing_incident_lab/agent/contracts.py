@@ -12,6 +12,7 @@ from agentic_manufacturing_incident_lab.domain.models import (
     ScalarValue,
 )
 from agentic_manufacturing_incident_lab.domain.task import TaskState, TaskStatus
+from agentic_manufacturing_incident_lab.agent.memory import WorkingMemory
 from agentic_manufacturing_incident_lab.runtime import ActionExecutionRecord
 from agentic_manufacturing_incident_lab.tools import ToolSpec
 
@@ -24,6 +25,7 @@ class AgentContext:
     known_asset_ids: tuple[str, ...]
     task_state: TaskState
     available_tools: tuple[ToolSpec, ...]
+    working_memory: WorkingMemory
     executions: tuple[ActionExecutionRecord, ...] = ()
 
     def __post_init__(self) -> None:
@@ -42,6 +44,10 @@ class AgentContext:
             raise ValueError("task state must match the context incident")
         if self.task_state.status is not TaskStatus.INVESTIGATING:
             raise ValueError("planner context requires an investigating task")
+        if self.working_memory.task_id != self.task_state.task_id:
+            raise ValueError("working memory must match the context task")
+        if self.working_memory.incident_id != self.incident.incident_id:
+            raise ValueError("working memory must match the context incident")
 
         tool_names = tuple(spec.name for spec in available_tools)
         if len(set(tool_names)) != len(tool_names):
@@ -53,6 +59,17 @@ class AgentContext:
             record.action.incident_id != self.incident.incident_id for record in executions
         ):
             raise ValueError("all executions must match the context incident")
+        if self.working_memory.step_budget.actions_used != len(executions):
+            raise ValueError("working memory actions_used must match context executions")
+        known_observation_ids = {
+            observation.observation_id
+            for record in executions
+            for observation in record.observations
+        }
+        if not set(self.working_memory.referenced_observation_ids).issubset(
+            known_observation_ids
+        ):
+            raise ValueError("working memory may only reference context observations")
 
         object.__setattr__(self, "known_asset_ids", known_asset_ids)
         object.__setattr__(self, "available_tools", available_tools)

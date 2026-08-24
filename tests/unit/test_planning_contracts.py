@@ -9,8 +9,10 @@ from agentic_manufacturing_incident_lab.agent import (
     CompleteDecision,
     PlanningDecision,
     PlanningPolicy,
+    StepBudget,
     StopDecision,
     StopReason,
+    WorkingMemory,
 )
 from agentic_manufacturing_incident_lab.domain.execution import (
     ActionResult,
@@ -108,6 +110,29 @@ def make_execution(incident: Incident) -> ActionExecutionRecord:
     )
 
 
+def make_working_memory(
+    incident: Incident,
+    *,
+    executions: tuple[ActionExecutionRecord, ...] = (),
+) -> WorkingMemory:
+    updated_at = max(
+        (record.result.completed_at for record in executions),
+        default=REPORTED_AT + timedelta(seconds=1),
+    )
+    return WorkingMemory(
+        task_id="TASK-001",
+        incident_id=incident.incident_id,
+        revision=0,
+        facts=(),
+        open_questions=(),
+        step_budget=StepBudget(
+            action_limit=10,
+            actions_used=len(executions),
+        ),
+        updated_at=updated_at,
+    )
+
+
 def make_context(*, executions=()) -> AgentContext:
     incident = make_incident()
     return AgentContext(
@@ -115,6 +140,7 @@ def make_context(*, executions=()) -> AgentContext:
         known_asset_ids=["ST-01", "ST-02", "GW-01"],  # type: ignore[arg-type]
         task_state=make_task(incident),
         available_tools=[make_tool_spec()],  # type: ignore[arg-type]
+        working_memory=make_working_memory(incident, executions=executions),
         executions=executions,
     )
 
@@ -127,6 +153,7 @@ def test_context_exposes_only_public_tools_and_execution_observations() -> None:
         known_asset_ids=("ST-01", "ST-02", "GW-01"),
         task_state=make_task(incident),
         available_tools=(make_tool_spec(),),
+        working_memory=make_working_memory(incident, executions=(execution,)),
         executions=[execution],  # type: ignore[arg-type]
     )
 
@@ -145,6 +172,7 @@ def test_context_requires_investigating_task() -> None:
             known_asset_ids=("ST-01", "ST-02"),
             task_state=make_task(incident, TaskStatus.COMPLETED),
             available_tools=(make_tool_spec(),),
+            working_memory=make_working_memory(incident),
         )
 
 
@@ -158,6 +186,7 @@ def test_context_rejects_duplicate_available_tools() -> None:
             known_asset_ids=("ST-01", "ST-02"),
             task_state=make_task(incident),
             available_tools=(spec, spec),
+            working_memory=make_working_memory(incident),
         )
 
 
@@ -172,6 +201,7 @@ def test_context_rejects_execution_from_another_incident() -> None:
             known_asset_ids=("ST-01", "ST-02"),
             task_state=make_task(incident),
             available_tools=(make_tool_spec(),),
+            working_memory=make_working_memory(incident, executions=(execution,)),
             executions=(execution,),
         )
 

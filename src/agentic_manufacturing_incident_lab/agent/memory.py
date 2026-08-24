@@ -7,6 +7,9 @@ from agentic_manufacturing_incident_lab.domain._validation import (
     require_text,
     require_timezone,
 )
+from agentic_manufacturing_incident_lab.domain.execution import ActionResultStatus
+from agentic_manufacturing_incident_lab.domain.models import Action, Incident
+from agentic_manufacturing_incident_lab.runtime.executor import ActionExecutionRecord
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,3 +151,112 @@ class WorkingMemory:
                 for observation_id in fact.observation_ids
             )
         )
+
+
+def initialize_working_memory(
+    *,
+    task_id: str,
+    incident: Incident,
+    action_limit: int,
+    updated_at: datetime,
+) -> WorkingMemory:
+    """Create revision zero with the incident goal as the first open question."""
+    require_timezone(updated_at, "updated_at")
+    if updated_at < incident.reported_at:
+        raise ValueError("memory cannot start before the incident was reported")
+    return WorkingMemory(
+        task_id=task_id,
+        incident_id=incident.incident_id,
+        revision=0,
+        facts=(),
+        open_questions=(
+            OpenQuestion(
+                question_id="Q-GOAL",
+                incident_id=incident.incident_id,
+                prompt=incident.goal,
+                opened_at=updated_at,
+            ),
+        ),
+        step_budget=StepBudget(action_limit=action_limit),
+        updated_at=updated_at,
+    )
+
+
+def prepare_action_memory(memory: WorkingMemory, action: Action) -> WorkingMemory:
+    """Open the action's question and consume one budget step before execution."""
+    if action.incident_id != memory.incident_id:
+        raise ValueError("action must match the memory incident")
+    if action.requested_at <= memory.updated_at:
+        raise ValueError("action request must be later than memory updated_at")
+    question = OpenQuestion(
+        question_id=f"Q-{action.action_id}",
+        incident_id=memory.incident_id,
+        prompt=action.rationale,
+        opened_at=action.requested_at,
+    )
+    return replace(
+        memory,
+        revision=memory.revision + 1,
+        open_questions=(*memory.open_questions, question),
+        step_budget=memory.step_budget.consume(),
+        updated_at=action.requested_at,
+    )
+
+
+def record_action_memory(
+    memory: WorkingMemory,
+    record: ActionExecutionRecord,
+) -> WorkingMemory:
+    """Project one completed execution into facts and unresolved questions."""
+    if record.action.incident_id != memory.incident_id:
+        raise ValueError("execution must match the memory incident")
+    if record.result.completed_at <= memory.updated_at:
+        raise ValueError("execution result must be later than memory updated_at")
+    action_question_id = f"Q-{record.action.action_id}"
+    if action_question_id not in {
+        question.question_id for question in memory.open_questions
+    }:
+        raise ValueError("memory must contain the action question before recording")
+
+    new_facts = tuple(
+        MemoryFact(
+            fact_id=f"FACT-{observation.observation_id}",
+            incident_id=memory.incident_id,
+            statement=observation.summary,
+            observation_ids=(observation.observation_id,),
+            recorded_at=record.result.completed_at,
+        )
+        for observation in record.observations
+    )
+    answered = (
+        record.result.status is ActionResultStatus.SUCCEEDED and bool(new_facts)
+    )
+    open_questions = tuple(
+        question
+        for question in memory.open_questions
+        if not answered or question.question_id != action_question_id
+    )
+    return replace(
+        memory,
+        revision=memory.revision + 1,
+        facts=(*memory.facts, *new_facts),
+        open_questions=open_questions,
+        updated_at=record.result.completed_at,
+    )
+
+
+def complete_working_memory(
+    memory: WorkingMemory,
+    *,
+    updated_at: datetime,
+) -> WorkingMemory:
+    """Close all remaining questions when evidence supports task completion."""
+    require_timezone(updated_at, "updated_at")
+    if updated_at <= memory.updated_at:
+        raise ValueError("completion must be later than memory updated_at")
+    return replace(
+        memory,
+        revision=memory.revision + 1,
+        open_questions=(),
+        updated_at=updated_at,
+    )

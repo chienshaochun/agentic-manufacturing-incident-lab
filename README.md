@@ -42,7 +42,7 @@
 
 ## 目前進度
 
-Phase 2 已完成：專案已具備可重播的合成情境、模擬環境、工具白名單、診斷工具、執行紀錄與固定 SOP baseline。Phase 3 將加入能根據 Observation 動態選擇 Action 的單 Agent。
+Phase 3 進行中：Phase 2 的模擬環境、工具系統與固定 SOP baseline 已完成，目前正在建立可替換的 Planner 契約與單 Agent 決策循環。
 
 ## 本機手動演練
 

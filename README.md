@@ -38,13 +38,13 @@
 - 故障注入、評估指標與完整追蹤紀錄
 - Streamlit 操作介面與事件調查報告
 
-詳細邊界與驗收條件見 [產品契約](docs/PRODUCT_CONTRACT.md)，逐步實作方式見 [學習路線圖](docs/LEARNING_ROADMAP.md)，Phase 1 的資料關係見 [領域模型](docs/DOMAIN_MODEL.md)。
+詳細邊界與驗收條件見 [產品契約](docs/PRODUCT_CONTRACT.md)，逐步實作方式見 [學習路線圖](docs/LEARNING_ROADMAP.md)，Phase 1 的資料關係見 [領域模型](docs/DOMAIN_MODEL.md)，Phase 2 的執行架構見 [模擬環境與工具系統](docs/PHASE_2_SIMULATOR_AND_TOOLS.md)。
 
 ## 目前進度
 
-Phase 2 進行中：Phase 1 的不可變領域模型已完成，目前正在建立可重播的合成情境與模擬工具。Agent 執行循環將在模擬工具完成後加入。
+Phase 2 已完成：專案已具備可重播的合成情境、模擬環境、工具白名單、診斷工具、執行紀錄與固定 SOP baseline。Phase 3 將加入能根據 Observation 動態選擇 Action 的單 Agent。
 
-## Phase 1 手動演練
+## 本機手動演練
 
 建立 Python 3.12 Conda 環境，並以 editable mode 安裝專案與開發依賴：
 
@@ -66,7 +66,7 @@ python examples\baseline_workflow.py
 python -m pytest
 ```
 
-walkthrough 只會手動建立並串接 Phase 1 record，不會呼叫 LLM、網路、真實工具或設備。
+目前所有 walkthrough 都只使用合成資料與本機 deterministic Python 邏輯，不會呼叫 LLM、網路、真實工具或設備。
 
 ## 技術原則
 

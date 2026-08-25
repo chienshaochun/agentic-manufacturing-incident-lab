@@ -129,6 +129,7 @@ def test_coordinator_stops_before_report_when_review_needs_attention() -> None:
     assert result.status is MultiAgentStatus.SAFE_STOPPED
     assert result.safety_review.outcome is SafetyReviewOutcome.REQUIRES_ATTENTION
     assert result.report is None
+    assert result.failures == ()
     assert [handoff.kind for handoff in result.ledger.handoffs] == [
         HandoffKind.INVESTIGATION_REQUEST,
         HandoffKind.DIAGNOSTIC_RESULT,
@@ -184,6 +185,18 @@ def test_completed_aggregate_rejects_missing_report() -> None:
     with pytest.raises(ValueError, match="requires a report"):
         MultiAgentRun(
             status=MultiAgentStatus.COMPLETED,
+            ledger=result.ledger,
+            diagnostic=result.diagnostic,
+            safety_review=result.safety_review,
+        )
+
+
+def test_safe_stop_without_failure_requires_nonapproved_review() -> None:
+    _, result = run_workflow()
+
+    with pytest.raises(ValueError, match="requires a non-approved safety review"):
+        MultiAgentRun(
+            status=MultiAgentStatus.SAFE_STOPPED,
             ledger=result.ledger,
             diagnostic=result.diagnostic,
             safety_review=result.safety_review,

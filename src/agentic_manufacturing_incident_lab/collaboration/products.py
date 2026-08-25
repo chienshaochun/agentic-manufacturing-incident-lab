@@ -6,6 +6,7 @@ from enum import StrEnum
 
 from agentic_manufacturing_incident_lab.collaboration.contracts import (
     AgentHandoff,
+    AgentRole,
     HandoffKind,
     HandoffLedger,
 )
@@ -127,61 +128,124 @@ class MultiAgentStatus(StrEnum):
     SAFE_STOPPED = "safe_stopped"
 
 
+class CollaborationStage(StrEnum):
+    """Workflow boundary at which one collaboration failure occurred."""
+
+    DIAGNOSTIC = "diagnostic"
+    SAFETY_REVIEW = "safety_review"
+    REPORTING = "reporting"
+
+
+class CollaborationFailureKind(StrEnum):
+    """Controlled classification of one specialist collaboration failure."""
+
+    SPECIALIST_ERROR = "specialist_error"
+    INVALID_RESPONSE = "invalid_response"
+    CONFLICTING_RESULT = "conflicting_result"
+
+
+@dataclass(frozen=True, slots=True)
+class CollaborationFailure:
+    """Auditable failure captured at a specialist request boundary."""
+
+    failure_id: str
+    incident_id: str
+    stage: CollaborationStage
+    role: AgentRole
+    kind: CollaborationFailureKind
+    detail: str
+    related_request_id: str
+    occurred_at: datetime
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "failure_id",
+            "incident_id",
+            "detail",
+            "related_request_id",
+        ):
+            require_text(getattr(self, field_name), field_name)
+        require_timezone(self.occurred_at, "occurred_at")
+
+
 @dataclass(frozen=True, slots=True)
 class MultiAgentRun:
     """Aggregate containing all specialist outputs and communication history."""
 
     status: MultiAgentStatus
     ledger: HandoffLedger
-    diagnostic: DiagnosticWorkProduct
-    safety_review: SafetyReviewProduct
+    diagnostic: DiagnosticWorkProduct | None = None
+    safety_review: SafetyReviewProduct | None = None
     report: ReportWorkProduct | None = None
+    failures: tuple[CollaborationFailure, ...] = ()
 
     def __post_init__(self) -> None:
-        incident_id = self.diagnostic.run.incident.incident_id
-        if self.ledger.incident_id != incident_id:
-            raise ValueError("multi-agent ledger must match diagnostic incident")
-        ledger_handoffs = set(self.ledger.handoffs)
-        required_handoffs = {
-            self.diagnostic.handoff,
-            self.safety_review.handoff,
-        }
-        if not required_handoffs.issubset(ledger_handoffs):
-            raise ValueError("multi-agent ledger must contain specialist handoffs")
-        if self.safety_review.handoff.incident_id != incident_id:
-            raise ValueError("safety review must match diagnostic incident")
-        if self.safety_review.handoff.action_ids != self.diagnostic.handoff.action_ids:
-            raise ValueError("safety review must cover every diagnostic action")
-        if (
-            self.safety_review.handoff.observation_ids
-            != self.diagnostic.handoff.observation_ids
-        ):
-            raise ValueError("safety review must cover every diagnostic observation")
+        incident_id = self.ledger.incident_id
+        failures = tuple(self.failures)
+        failure_ids = tuple(failure.failure_id for failure in failures)
+        if len(set(failure_ids)) != len(failure_ids):
+            raise ValueError("collaboration failures must have unique failure_id values")
+        if any(failure.incident_id != incident_id for failure in failures):
+            raise ValueError("collaboration failures must match the ledger incident")
 
-        expected_kinds = (
+        expected_workflow = (
             HandoffKind.INVESTIGATION_REQUEST,
             HandoffKind.DIAGNOSTIC_RESULT,
             HandoffKind.SAFETY_REVIEW_REQUEST,
             HandoffKind.SAFETY_REVIEW_RESULT,
+            HandoffKind.REPORT_REQUEST,
+            HandoffKind.REPORT_RESULT,
         )
-        if self.status is MultiAgentStatus.COMPLETED:
-            expected_kinds = (
-                *expected_kinds,
-                HandoffKind.REPORT_REQUEST,
-                HandoffKind.REPORT_RESULT,
+        actual_workflow = tuple(
+            handoff.kind for handoff in self.ledger.handoffs
+        )
+        if not actual_workflow or actual_workflow != expected_workflow[
+            : len(actual_workflow)
+        ]:
+            raise ValueError(
+                "multi-agent ledger must follow the specialist workflow order"
             )
-        if tuple(handoff.kind for handoff in self.ledger.handoffs) != expected_kinds:
-            raise ValueError("multi-agent ledger has an invalid workflow sequence")
+
+        ledger_handoffs = set(self.ledger.handoffs)
+        if self.diagnostic is not None:
+            if self.diagnostic.run.incident.incident_id != incident_id:
+                raise ValueError("diagnostic product must match the ledger incident")
+            if self.diagnostic.handoff not in ledger_handoffs:
+                raise ValueError("multi-agent ledger must contain diagnostic handoff")
+        if self.safety_review is not None:
+            if self.diagnostic is None:
+                raise ValueError("safety review requires a diagnostic product")
+            if self.safety_review.handoff not in ledger_handoffs:
+                raise ValueError("multi-agent ledger must contain safety review handoff")
+            if self.safety_review.handoff.incident_id != incident_id:
+                raise ValueError("safety review must match diagnostic incident")
+            if (
+                self.safety_review.handoff.action_ids
+                != self.diagnostic.handoff.action_ids
+            ):
+                raise ValueError("safety review must cover every diagnostic action")
+            if (
+                self.safety_review.handoff.observation_ids
+                != self.diagnostic.handoff.observation_ids
+            ):
+                raise ValueError("safety review must cover every diagnostic observation")
 
         if self.status is MultiAgentStatus.COMPLETED:
+            if failures:
+                raise ValueError("completed multi-agent run must not contain failures")
+            if self.diagnostic is None or self.safety_review is None:
+                raise ValueError("completed multi-agent run requires specialist products")
             if self.safety_review.outcome is not SafetyReviewOutcome.APPROVED:
                 raise ValueError("completed multi-agent run requires approved review")
             if self.report is None:
                 raise ValueError("completed multi-agent run requires a report")
-        elif self.report is not None:
-            raise ValueError("safe-stopped multi-agent run must not contain a report")
+        else:
+            if self.report is not None:
+                raise ValueError("safe-stopped multi-agent run must not contain a report")
 
         if self.report is not None:
+            if self.diagnostic is None:
+                raise ValueError("report requires a diagnostic product")
             if self.report.report.incident_id != incident_id:
                 raise ValueError("report must match diagnostic incident")
             if self.report.handoff not in ledger_handoffs:
@@ -198,5 +262,36 @@ class MultiAgentRun:
             )
             if self.report.report.evidence_ids != evidence_ids:
                 raise ValueError("report must include every diagnostic evidence record")
-        if self.ledger.pending_requests:
-            raise ValueError("terminal multi-agent run must not contain pending requests")
+
+        pending_request_ids = {
+            handoff.handoff_id for handoff in self.ledger.pending_requests
+        }
+        failure_request_ids = {
+            failure.related_request_id for failure in failures
+        }
+        if not pending_request_ids.issubset(failure_request_ids):
+            raise ValueError(
+                "pending requests must be explained by collaboration failures"
+            )
+        known_request_ids = {
+            handoff.handoff_id
+            for handoff in self.ledger.handoffs
+            if handoff.kind
+            in {
+                HandoffKind.INVESTIGATION_REQUEST,
+                HandoffKind.SAFETY_REVIEW_REQUEST,
+                HandoffKind.REPORT_REQUEST,
+            }
+        }
+        if not failure_request_ids.issubset(known_request_ids):
+            raise ValueError("collaboration failure must reference a ledger request")
+        if self.status is MultiAgentStatus.SAFE_STOPPED and not failures and (
+            self.diagnostic is None
+            or self.safety_review is None
+            or self.safety_review.outcome is SafetyReviewOutcome.APPROVED
+        ):
+            raise ValueError(
+                "safe stop without a collaboration failure requires "
+                "a non-approved safety review"
+            )
+        object.__setattr__(self, "failures", failures)

@@ -11,6 +11,9 @@ from agentic_manufacturing_incident_lab.collaboration.coordinator import (
 )
 from agentic_manufacturing_incident_lab.collaboration.diagnostic import DiagnosticAgent
 from agentic_manufacturing_incident_lab.collaboration.products import (
+    CollaborationFailure,
+    CollaborationFailureKind,
+    CollaborationStage,
     DiagnosticWorkProduct,
     IncidentReport,
     MultiAgentRun,
@@ -27,6 +30,9 @@ from agentic_manufacturing_incident_lab.collaboration.safety_reviewer import (
 __all__ = [
     "AgentHandoff",
     "AgentRole",
+    "CollaborationFailure",
+    "CollaborationFailureKind",
+    "CollaborationStage",
     "CoordinatorAgent",
     "DiagnosticAgent",
     "DiagnosticWorkProduct",

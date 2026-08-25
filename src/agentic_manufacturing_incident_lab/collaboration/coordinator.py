@@ -1,4 +1,4 @@
-"""Central coordinator for the deterministic multi-agent workflow."""
+"""Central coordinator and failure boundary for multi-agent collaboration."""
 
 from datetime import timedelta
 
@@ -10,19 +10,26 @@ from agentic_manufacturing_incident_lab.collaboration.contracts import (
 )
 from agentic_manufacturing_incident_lab.collaboration.diagnostic import DiagnosticAgent
 from agentic_manufacturing_incident_lab.collaboration.products import (
+    CollaborationFailure,
+    CollaborationFailureKind,
+    CollaborationStage,
+    DiagnosticWorkProduct,
     MultiAgentRun,
     MultiAgentStatus,
+    ReportWorkProduct,
     SafetyReviewOutcome,
+    SafetyReviewProduct,
 )
 from agentic_manufacturing_incident_lab.collaboration.reporter import ReporterAgent
 from agentic_manufacturing_incident_lab.collaboration.safety_reviewer import (
     SafetyReviewerAgent,
 )
 from agentic_manufacturing_incident_lab.domain.models import Incident
+from agentic_manufacturing_incident_lab.domain.task import TaskStatus
 
 
 class CoordinatorAgent:
-    """Route one incident through diagnostic, safety, and reporting specialists."""
+    """Route specialists and convert collaboration failures into safe stops."""
 
     __slots__ = ("_diagnostic", "_reporter", "_safety_reviewer")
 
@@ -43,7 +50,7 @@ class CoordinatorAgent:
         incident: Incident,
         known_asset_ids: tuple[str, ...],
     ) -> MultiAgentRun:
-        """Run the synchronous specialist workflow with auditable handoffs."""
+        """Run specialists synchronously while containing expected role failures."""
         ledger = HandoffLedger(incident_id=incident.incident_id)
         investigation_request = AgentHandoff(
             handoff_id=f"HND-{incident.incident_id}-INVESTIGATE",
@@ -55,12 +62,44 @@ class CoordinatorAgent:
             created_at=incident.reported_at,
         )
         ledger = ledger.append(investigation_request)
-        diagnostic = self._diagnostic.handle(
-            investigation_request,
-            incident=incident,
-            known_asset_ids=known_asset_ids,
-        )
-        ledger = ledger.append(diagnostic.handoff)
+        try:
+            diagnostic = self._diagnostic.handle(
+                investigation_request,
+                incident=incident,
+                known_asset_ids=known_asset_ids,
+            )
+        except Exception as error:
+            return self._failed_run(
+                incident=incident,
+                ledger=ledger,
+                request=investigation_request,
+                stage=CollaborationStage.DIAGNOSTIC,
+                role=AgentRole.DIAGNOSTIC,
+                kind=CollaborationFailureKind.SPECIALIST_ERROR,
+                detail=self._error_detail(error),
+            )
+        if not isinstance(diagnostic, DiagnosticWorkProduct):
+            return self._failed_run(
+                incident=incident,
+                ledger=ledger,
+                request=investigation_request,
+                stage=CollaborationStage.DIAGNOSTIC,
+                role=AgentRole.DIAGNOSTIC,
+                kind=CollaborationFailureKind.INVALID_RESPONSE,
+                detail="DiagnosticAgent returned an invalid work product.",
+            )
+        try:
+            ledger = ledger.append(diagnostic.handoff)
+        except (AttributeError, TypeError, ValueError) as error:
+            return self._failed_run(
+                incident=incident,
+                ledger=ledger,
+                request=investigation_request,
+                stage=CollaborationStage.DIAGNOSTIC,
+                role=AgentRole.DIAGNOSTIC,
+                kind=CollaborationFailureKind.INVALID_RESPONSE,
+                detail=self._error_detail(error),
+            )
 
         safety_request = AgentHandoff(
             handoff_id=f"HND-{incident.incident_id}-SAFETY-REVIEW",
@@ -74,12 +113,68 @@ class CoordinatorAgent:
             action_ids=diagnostic.handoff.action_ids,
         )
         ledger = ledger.append(safety_request)
-        safety_review = self._safety_reviewer.handle(
-            safety_request,
-            diagnostic=diagnostic,
-        )
-        ledger = ledger.append(safety_review.handoff)
+        try:
+            safety_review = self._safety_reviewer.handle(
+                safety_request,
+                diagnostic=diagnostic,
+            )
+        except Exception as error:
+            return self._failed_run(
+                incident=incident,
+                ledger=ledger,
+                request=safety_request,
+                stage=CollaborationStage.SAFETY_REVIEW,
+                role=AgentRole.SAFETY_REVIEWER,
+                kind=CollaborationFailureKind.SPECIALIST_ERROR,
+                detail=self._error_detail(error),
+                diagnostic=diagnostic,
+            )
+        if not isinstance(safety_review, SafetyReviewProduct):
+            return self._failed_run(
+                incident=incident,
+                ledger=ledger,
+                request=safety_request,
+                stage=CollaborationStage.SAFETY_REVIEW,
+                role=AgentRole.SAFETY_REVIEWER,
+                kind=CollaborationFailureKind.INVALID_RESPONSE,
+                detail="SafetyReviewerAgent returned an invalid work product.",
+                diagnostic=diagnostic,
+            )
+        try:
+            ledger = ledger.append(safety_review.handoff)
+        except (AttributeError, TypeError, ValueError) as error:
+            return self._failed_run(
+                incident=incident,
+                ledger=ledger,
+                request=safety_request,
+                stage=CollaborationStage.SAFETY_REVIEW,
+                role=AgentRole.SAFETY_REVIEWER,
+                kind=CollaborationFailureKind.INVALID_RESPONSE,
+                detail=self._error_detail(error),
+                diagnostic=diagnostic,
+            )
 
+        if (
+            safety_review.outcome is SafetyReviewOutcome.APPROVED
+            and (
+                diagnostic.run.final_state.status is not TaskStatus.COMPLETED
+                or not diagnostic.run.evidence
+            )
+        ):
+            return self._failed_run(
+                incident=incident,
+                ledger=ledger,
+                request=safety_request,
+                stage=CollaborationStage.SAFETY_REVIEW,
+                role=AgentRole.SAFETY_REVIEWER,
+                kind=CollaborationFailureKind.CONFLICTING_RESULT,
+                detail=(
+                    "Safety review approved a diagnostic run without "
+                    "evidence-backed completion."
+                ),
+                diagnostic=diagnostic,
+                safety_review=safety_review,
+            )
         if safety_review.outcome is not SafetyReviewOutcome.APPROVED:
             return MultiAgentRun(
                 status=MultiAgentStatus.SAFE_STOPPED,
@@ -100,16 +195,94 @@ class CoordinatorAgent:
             action_ids=diagnostic.handoff.action_ids,
         )
         ledger = ledger.append(report_request)
-        report = self._reporter.handle(
-            report_request,
-            diagnostic=diagnostic,
-            safety_review=safety_review,
-        )
-        ledger = ledger.append(report.handoff)
+        try:
+            report = self._reporter.handle(
+                report_request,
+                diagnostic=diagnostic,
+                safety_review=safety_review,
+            )
+        except Exception as error:
+            return self._failed_run(
+                incident=incident,
+                ledger=ledger,
+                request=report_request,
+                stage=CollaborationStage.REPORTING,
+                role=AgentRole.REPORTER,
+                kind=CollaborationFailureKind.SPECIALIST_ERROR,
+                detail=self._error_detail(error),
+                diagnostic=diagnostic,
+                safety_review=safety_review,
+            )
+        if not isinstance(report, ReportWorkProduct):
+            return self._failed_run(
+                incident=incident,
+                ledger=ledger,
+                request=report_request,
+                stage=CollaborationStage.REPORTING,
+                role=AgentRole.REPORTER,
+                kind=CollaborationFailureKind.INVALID_RESPONSE,
+                detail="ReporterAgent returned an invalid work product.",
+                diagnostic=diagnostic,
+                safety_review=safety_review,
+            )
+        try:
+            ledger = ledger.append(report.handoff)
+        except (AttributeError, TypeError, ValueError) as error:
+            return self._failed_run(
+                incident=incident,
+                ledger=ledger,
+                request=report_request,
+                stage=CollaborationStage.REPORTING,
+                role=AgentRole.REPORTER,
+                kind=CollaborationFailureKind.INVALID_RESPONSE,
+                detail=self._error_detail(error),
+                diagnostic=diagnostic,
+                safety_review=safety_review,
+            )
         return MultiAgentRun(
             status=MultiAgentStatus.COMPLETED,
             ledger=ledger,
             diagnostic=diagnostic,
             safety_review=safety_review,
             report=report,
+        )
+
+    @staticmethod
+    def _error_detail(error: Exception) -> str:
+        detail = str(error).strip() or "no error detail"
+        return f"{type(error).__name__}: {detail}"
+
+    @staticmethod
+    def _failed_run(
+        *,
+        incident: Incident,
+        ledger: HandoffLedger,
+        request: AgentHandoff,
+        stage: CollaborationStage,
+        role: AgentRole,
+        kind: CollaborationFailureKind,
+        detail: str,
+        diagnostic: DiagnosticWorkProduct | None = None,
+        safety_review: SafetyReviewProduct | None = None,
+    ) -> MultiAgentRun:
+        failure = CollaborationFailure(
+            failure_id=f"FAIL-{incident.incident_id}-{stage.value.upper()}",
+            incident_id=incident.incident_id,
+            stage=stage,
+            role=role,
+            kind=kind,
+            detail=detail,
+            related_request_id=request.handoff_id,
+            occurred_at=max(
+                request.created_at,
+                ledger.handoffs[-1].created_at,
+            )
+            + timedelta(seconds=1),
+        )
+        return MultiAgentRun(
+            status=MultiAgentStatus.SAFE_STOPPED,
+            ledger=ledger,
+            diagnostic=diagnostic,
+            safety_review=safety_review,
+            failures=(failure,),
         )

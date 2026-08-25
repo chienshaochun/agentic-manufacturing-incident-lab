@@ -95,6 +95,8 @@ revision 7：完成調查、關閉 Q-GOAL
 
 ## Checkpoint 格式
 
+> 本章保留 Phase 4 完成當時的 schema v1 格式。Phase 5 加入 Attempt、Safety、Approval 與 Recovery 紀錄後，目前 schema 已升級為 v3；最新欄位請見 Phase 5 文件。
+
 Checkpoint 外層格式為：
 
 ```json

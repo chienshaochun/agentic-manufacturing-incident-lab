@@ -20,6 +20,22 @@ class ToolParameterError(ValueError):
     """Raised when tool parameters do not satisfy a declared contract."""
 
 
+class ToolInvocationError(RuntimeError):
+    """Base error for an expected failure raised while invoking a tool."""
+
+
+class ToolTimeoutError(ToolInvocationError):
+    """Raised when a tool does not complete within its execution deadline."""
+
+
+class TransientToolError(ToolInvocationError):
+    """Raised for a temporary tool failure that may succeed when retried."""
+
+
+class PermanentToolError(ToolInvocationError):
+    """Raised for a known tool failure that must not be retried."""
+
+
 class ToolParameterType(StrEnum):
     """Serializable scalar types accepted by tool parameters."""
 

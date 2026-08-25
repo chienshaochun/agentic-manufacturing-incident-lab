@@ -5,6 +5,7 @@ import pytest
 
 from agentic_manufacturing_incident_lab.agent import RuleBasedPlanner, SingleAgentRunner
 from agentic_manufacturing_incident_lab.runtime import (
+    CHECKPOINT_SCHEMA_VERSION,
     CheckpointError,
     deserialize_checkpoint,
     load_checkpoint,
@@ -70,6 +71,14 @@ def test_serialization_is_deterministic_for_same_run() -> None:
     run = run_agent()
 
     assert serialize_checkpoint(run) == serialize_checkpoint(run)
+
+
+def test_checkpoint_schema_tracks_attempt_history_format() -> None:
+    envelope = json.loads(serialize_checkpoint(run_agent()))
+
+    assert CHECKPOINT_SCHEMA_VERSION == 3
+    assert envelope["schema_version"] == 3
+    assert "attempts" in envelope["run"]["executions"][0]
 
 
 def test_checkpoint_file_save_and_load_round_trip(tmp_path) -> None:

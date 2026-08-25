@@ -3,6 +3,8 @@
 from agentic_manufacturing_incident_lab.runtime.executor import (
     ActionExecutionRecord,
     ActionExecutor,
+    ExecutionAttempt,
+    RetryPolicy,
 )
 from agentic_manufacturing_incident_lab.runtime.run import InvestigationRun
 from agentic_manufacturing_incident_lab.runtime.checkpoint import (
@@ -18,8 +20,10 @@ __all__ = [
     "CHECKPOINT_SCHEMA_VERSION",
     "ActionExecutionRecord",
     "ActionExecutor",
+    "ExecutionAttempt",
     "CheckpointError",
     "InvestigationRun",
+    "RetryPolicy",
     "deserialize_checkpoint",
     "load_checkpoint",
     "save_checkpoint",

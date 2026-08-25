@@ -37,6 +37,13 @@ from agentic_manufacturing_incident_lab.domain.models import (
 from agentic_manufacturing_incident_lab.domain.task import TaskState, TaskStatus
 from agentic_manufacturing_incident_lab.runtime.executor import ActionExecutionRecord
 from agentic_manufacturing_incident_lab.runtime.run import InvestigationRun
+from agentic_manufacturing_incident_lab.safety import (
+    ApprovalDecision,
+    ApprovalOutcome,
+    ApprovalRequest,
+    SafetyAssessment,
+    SafetyDisposition,
+)
 
 CHECKPOINT_SCHEMA_VERSION = 1
 CHECKPOINT_KIND = "agentic_manufacturing_investigation"
@@ -159,11 +166,20 @@ def _object_without_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 def _encode_run(run: InvestigationRun) -> dict[str, Any]:
     return {
+        "approval_decisions": [
+            _encode_approval_decision(item) for item in run.approval_decisions
+        ],
+        "approval_requests": [
+            _encode_approval_request(item) for item in run.approval_requests
+        ],
         "evidence": [_encode_evidence(item) for item in run.evidence],
         "executions": [_encode_execution(record) for record in run.executions],
         "incident": _encode_incident(run.incident),
         "memory_states": [
             _encode_working_memory(memory) for memory in run.memory_states
+        ],
+        "safety_assessments": [
+            _encode_safety_assessment(item) for item in run.safety_assessments
         ],
         "task_states": [_encode_task_state(state) for state in run.task_states],
     }
@@ -193,18 +209,9 @@ def _encode_task_state(state: TaskState) -> dict[str, Any]:
 
 
 def _encode_execution(record: ActionExecutionRecord) -> dict[str, Any]:
-    action = record.action
     result = record.result
     return {
-        "action": {
-            "action_id": action.action_id,
-            "incident_id": action.incident_id,
-            "parameters": dict(action.parameters),
-            "rationale": action.rationale,
-            "requested_at": action.requested_at.isoformat(),
-            "risk": action.risk.value,
-            "tool_name": action.tool_name,
-        },
+        "action": _encode_action(record.action),
         "observations": [
             {
                 "incident_id": observation.incident_id,
@@ -227,6 +234,51 @@ def _encode_execution(record: ActionExecutionRecord) -> dict[str, Any]:
             "status": result.status.value,
             "summary": result.summary,
         },
+    }
+
+
+def _encode_action(action: Action) -> dict[str, Any]:
+    return {
+        "action_id": action.action_id,
+        "incident_id": action.incident_id,
+        "parameters": dict(action.parameters),
+        "rationale": action.rationale,
+        "requested_at": action.requested_at.isoformat(),
+        "risk": action.risk.value,
+        "tool_name": action.tool_name,
+    }
+
+
+def _encode_safety_assessment(assessment: SafetyAssessment) -> dict[str, Any]:
+    return {
+        "action_id": assessment.action_id,
+        "assessed_at": assessment.assessed_at.isoformat(),
+        "assessment_id": assessment.assessment_id,
+        "disposition": assessment.disposition.value,
+        "incident_id": assessment.incident_id,
+        "policy_name": assessment.policy_name,
+        "rationale": assessment.rationale,
+    }
+
+
+def _encode_approval_request(request: ApprovalRequest) -> dict[str, Any]:
+    return {
+        "action": _encode_action(request.action),
+        "assessment": _encode_safety_assessment(request.assessment),
+        "reason": request.reason,
+        "request_id": request.request_id,
+        "requested_at": request.requested_at.isoformat(),
+    }
+
+
+def _encode_approval_decision(decision: ApprovalDecision) -> dict[str, Any]:
+    return {
+        "decided_at": decision.decided_at.isoformat(),
+        "decided_by": decision.decided_by,
+        "decision_id": decision.decision_id,
+        "outcome": decision.outcome.value,
+        "rationale": decision.rationale,
+        "request": _encode_approval_request(decision.request),
     }
 
 
@@ -276,7 +328,16 @@ def _encode_working_memory(memory: WorkingMemory) -> dict[str, Any]:
 def _decode_run(data: dict[str, Any]) -> InvestigationRun:
     _require_exact_keys(
         data,
-        {"evidence", "executions", "incident", "memory_states", "task_states"},
+        {
+            "approval_decisions",
+            "approval_requests",
+            "evidence",
+            "executions",
+            "incident",
+            "memory_states",
+            "safety_assessments",
+            "task_states",
+        },
         "run",
     )
     return InvestigationRun(
@@ -296,6 +357,24 @@ def _decode_run(data: dict[str, Any]) -> InvestigationRun:
         memory_states=tuple(
             _decode_working_memory(_require_object(item, "working_memory"))
             for item in _require_list(data["memory_states"], "memory_states")
+        ),
+        safety_assessments=tuple(
+            _decode_safety_assessment(_require_object(item, "safety_assessment"))
+            for item in _require_list(
+                data["safety_assessments"],
+                "safety_assessments",
+            )
+        ),
+        approval_requests=tuple(
+            _decode_approval_request(_require_object(item, "approval_request"))
+            for item in _require_list(data["approval_requests"], "approval_requests")
+        ),
+        approval_decisions=tuple(
+            _decode_approval_decision(_require_object(item, "approval_decision"))
+            for item in _require_list(
+                data["approval_decisions"],
+                "approval_decisions",
+            )
         ),
     )
 
@@ -343,29 +422,7 @@ def _decode_task_state(data: dict[str, Any]) -> TaskState:
 
 def _decode_execution(data: dict[str, Any]) -> ActionExecutionRecord:
     _require_exact_keys(data, {"action", "observations", "result"}, "execution")
-    action_data = _require_object(data["action"], "action")
-    _require_exact_keys(
-        action_data,
-        {
-            "action_id",
-            "incident_id",
-            "parameters",
-            "rationale",
-            "requested_at",
-            "risk",
-            "tool_name",
-        },
-        "action",
-    )
-    action = Action(
-        action_id=_require_string(action_data["action_id"], "action_id"),
-        incident_id=_require_string(action_data["incident_id"], "incident_id"),
-        tool_name=_require_string(action_data["tool_name"], "tool_name"),
-        rationale=_require_string(action_data["rationale"], "rationale"),
-        risk=_decode_enum(ActionRisk, action_data["risk"], "risk"),
-        requested_at=_decode_datetime(action_data["requested_at"], "requested_at"),
-        parameters=_decode_scalar_mapping(action_data["parameters"], "parameters"),
-    )
+    action = _decode_action(_require_object(data["action"], "action"))
 
     result_data = _require_object(data["result"], "result")
     _require_exact_keys(
@@ -407,6 +464,95 @@ def _decode_execution(data: dict[str, Any]) -> ActionExecutionRecord:
         action=action,
         result=result,
         observations=observations,
+    )
+
+
+def _decode_action(action_data: dict[str, Any]) -> Action:
+    _require_exact_keys(
+        action_data,
+        {
+            "action_id",
+            "incident_id",
+            "parameters",
+            "rationale",
+            "requested_at",
+            "risk",
+            "tool_name",
+        },
+        "action",
+    )
+    return Action(
+        action_id=_require_string(action_data["action_id"], "action_id"),
+        incident_id=_require_string(action_data["incident_id"], "incident_id"),
+        tool_name=_require_string(action_data["tool_name"], "tool_name"),
+        rationale=_require_string(action_data["rationale"], "rationale"),
+        risk=_decode_enum(ActionRisk, action_data["risk"], "risk"),
+        requested_at=_decode_datetime(action_data["requested_at"], "requested_at"),
+        parameters=_decode_scalar_mapping(action_data["parameters"], "parameters"),
+    )
+
+
+def _decode_safety_assessment(data: dict[str, Any]) -> SafetyAssessment:
+    _require_exact_keys(
+        data,
+        {
+            "action_id",
+            "assessed_at",
+            "assessment_id",
+            "disposition",
+            "incident_id",
+            "policy_name",
+            "rationale",
+        },
+        "safety_assessment",
+    )
+    return SafetyAssessment(
+        assessment_id=_require_string(data["assessment_id"], "assessment_id"),
+        action_id=_require_string(data["action_id"], "action_id"),
+        incident_id=_require_string(data["incident_id"], "incident_id"),
+        policy_name=_require_string(data["policy_name"], "policy_name"),
+        disposition=_decode_enum(
+            SafetyDisposition,
+            data["disposition"],
+            "disposition",
+        ),
+        rationale=_require_string(data["rationale"], "rationale"),
+        assessed_at=_decode_datetime(data["assessed_at"], "assessed_at"),
+    )
+
+
+def _decode_approval_request(data: dict[str, Any]) -> ApprovalRequest:
+    _require_exact_keys(
+        data,
+        {"action", "assessment", "reason", "request_id", "requested_at"},
+        "approval_request",
+    )
+    return ApprovalRequest(
+        request_id=_require_string(data["request_id"], "request_id"),
+        action=_decode_action(_require_object(data["action"], "action")),
+        assessment=_decode_safety_assessment(
+            _require_object(data["assessment"], "safety_assessment")
+        ),
+        reason=_require_string(data["reason"], "reason"),
+        requested_at=_decode_datetime(data["requested_at"], "requested_at"),
+    )
+
+
+def _decode_approval_decision(data: dict[str, Any]) -> ApprovalDecision:
+    _require_exact_keys(
+        data,
+        {"decided_at", "decided_by", "decision_id", "outcome", "rationale", "request"},
+        "approval_decision",
+    )
+    return ApprovalDecision(
+        decision_id=_require_string(data["decision_id"], "decision_id"),
+        request=_decode_approval_request(
+            _require_object(data["request"], "approval_request")
+        ),
+        outcome=_decode_enum(ApprovalOutcome, data["outcome"], "outcome"),
+        decided_by=_require_string(data["decided_by"], "decided_by"),
+        rationale=_require_string(data["rationale"], "rationale"),
+        decided_at=_decode_datetime(data["decided_at"], "decided_at"),
     )
 
 

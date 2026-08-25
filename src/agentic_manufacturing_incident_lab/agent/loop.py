@@ -27,6 +27,7 @@ from agentic_manufacturing_incident_lab.runtime import (
     ActionExecutionRecord,
     ActionExecutor,
     InvestigationRun,
+    RetryPolicy,
 )
 from agentic_manufacturing_incident_lab.safety import (
     ApprovalDecision,
@@ -60,6 +61,7 @@ class SingleAgentRunner:
         registry: ToolRegistry,
         action_limit: int = 32,
         safety_policy: SafetyPolicy | None = None,
+        retry_policy: RetryPolicy | None = None,
     ) -> None:
         if (
             isinstance(action_limit, bool)
@@ -69,7 +71,7 @@ class SingleAgentRunner:
             raise ValueError("action_limit must be a positive integer")
         self._policy = policy
         self._registry = registry
-        self._executor = ActionExecutor(registry)
+        self._executor = ActionExecutor(registry, retry_policy=retry_policy)
         self._action_limit = action_limit
         self._safety_policy = safety_policy or RiskBasedSafetyPolicy()
 

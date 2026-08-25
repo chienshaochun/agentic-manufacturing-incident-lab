@@ -35,7 +35,10 @@ from agentic_manufacturing_incident_lab.domain.models import (
     ScalarValue,
 )
 from agentic_manufacturing_incident_lab.domain.task import TaskState, TaskStatus
-from agentic_manufacturing_incident_lab.runtime.executor import ActionExecutionRecord
+from agentic_manufacturing_incident_lab.runtime.executor import (
+    ActionExecutionRecord,
+    ExecutionAttempt,
+)
 from agentic_manufacturing_incident_lab.runtime.run import InvestigationRun
 from agentic_manufacturing_incident_lab.safety import (
     ApprovalDecision,
@@ -45,7 +48,7 @@ from agentic_manufacturing_incident_lab.safety import (
     SafetyDisposition,
 )
 
-CHECKPOINT_SCHEMA_VERSION = 1
+CHECKPOINT_SCHEMA_VERSION = 2
 CHECKPOINT_KIND = "agentic_manufacturing_investigation"
 
 
@@ -212,6 +215,16 @@ def _encode_execution(record: ActionExecutionRecord) -> dict[str, Any]:
     result = record.result
     return {
         "action": _encode_action(record.action),
+        "attempts": [
+            {
+                "attempt_number": attempt.attempt_number,
+                "completed_at": attempt.completed_at.isoformat(),
+                "error_code": attempt.error_code,
+                "status": attempt.status.value,
+                "summary": attempt.summary,
+            }
+            for attempt in record.attempts
+        ],
         "observations": [
             {
                 "incident_id": observation.incident_id,
@@ -421,7 +434,11 @@ def _decode_task_state(data: dict[str, Any]) -> TaskState:
 
 
 def _decode_execution(data: dict[str, Any]) -> ActionExecutionRecord:
-    _require_exact_keys(data, {"action", "observations", "result"}, "execution")
+    _require_exact_keys(
+        data,
+        {"action", "attempts", "observations", "result"},
+        "execution",
+    )
     action = _decode_action(_require_object(data["action"], "action"))
 
     result_data = _require_object(data["result"], "result")
@@ -460,10 +477,33 @@ def _decode_execution(data: dict[str, Any]) -> ActionExecutionRecord:
         _decode_observation(_require_object(item, "observation"))
         for item in _require_list(data["observations"], "observations")
     )
+    attempts = tuple(
+        _decode_execution_attempt(_require_object(item, "execution_attempt"))
+        for item in _require_list(data["attempts"], "attempts")
+    )
     return ActionExecutionRecord(
         action=action,
         result=result,
         observations=observations,
+        attempts=attempts,
+    )
+
+
+def _decode_execution_attempt(data: dict[str, Any]) -> ExecutionAttempt:
+    _require_exact_keys(
+        data,
+        {"attempt_number", "completed_at", "error_code", "status", "summary"},
+        "execution_attempt",
+    )
+    error_code = data["error_code"]
+    if error_code is not None:
+        error_code = _require_string(error_code, "error_code")
+    return ExecutionAttempt(
+        attempt_number=_require_integer(data["attempt_number"], "attempt_number"),
+        status=_decode_enum(ActionResultStatus, data["status"], "status"),
+        summary=_require_string(data["summary"], "summary"),
+        completed_at=_decode_datetime(data["completed_at"], "completed_at"),
+        error_code=error_code,
     )
 
 

@@ -38,11 +38,11 @@
 - 故障注入、評估指標與完整追蹤紀錄
 - Streamlit 操作介面與事件調查報告
 
-詳細邊界與驗收條件見 [產品契約](docs/PRODUCT_CONTRACT.md)，逐步實作方式見 [學習路線圖](docs/LEARNING_ROADMAP.md)，Phase 1 的資料關係見 [領域模型](docs/DOMAIN_MODEL.md)，Phase 2 的執行架構見 [模擬環境與工具系統](docs/PHASE_2_SIMULATOR_AND_TOOLS.md)，Phase 3 的決策流程見 [單一 Agent 決策循環](docs/PHASE_3_SINGLE_AGENT_LOOP.md)，Phase 4 的恢復架構見 [工作記憶與 Checkpoint](docs/PHASE_4_MEMORY_AND_CHECKPOINTS.md)，Phase 5 的安全邊界見 [批准、安全與故障恢復](docs/PHASE_5_SAFETY_AND_RECOVERY.md)。
+詳細邊界與驗收條件見 [產品契約](docs/PRODUCT_CONTRACT.md)，逐步實作方式見 [學習路線圖](docs/LEARNING_ROADMAP.md)，Phase 1 的資料關係見 [領域模型](docs/DOMAIN_MODEL.md)，Phase 2 的執行架構見 [模擬環境與工具系統](docs/PHASE_2_SIMULATOR_AND_TOOLS.md)，Phase 3 的決策流程見 [單一 Agent 決策循環](docs/PHASE_3_SINGLE_AGENT_LOOP.md)，Phase 4 的恢復架構見 [工作記憶與 Checkpoint](docs/PHASE_4_MEMORY_AND_CHECKPOINTS.md)，Phase 5 的安全邊界見 [批准、安全與故障恢復](docs/PHASE_5_SAFETY_AND_RECOVERY.md)，Phase 6 的角色分工見 [多 Agent 協作與比較](docs/PHASE_6_MULTI_AGENT_COLLABORATION.md)。
 
 ## 目前進度
 
-Phase 5 已完成：單 Agent 現在具備風險分級、人工批准、有限重試、Attempt 級稽核、固定故障注入、替代診斷路徑與安全停止。所有安全與復原紀錄都能保存到 checkpoint。下一階段將加入多 Agent 角色與結構化交接。
+Phase 6 已完成：Coordinator、Diagnostic、Safety Reviewer 與 Reporter 現在能透過結構化 handoff 協作；Coordinator 可以攔截角色異常、錯誤格式與矛盾結果，保存失敗紀錄並安全停止。專案也能在兩個隔離的模擬環境中公平比較 Single-agent 與 Multi-agent 的診斷結果、工具成本與治理成本。下一階段將加入 benchmark、量化評估與軌跡可觀測性。
 
 ## 本機手動演練
 
@@ -66,6 +66,7 @@ python examples\baseline_workflow.py
 python examples\single_agent_walkthrough.py
 python examples\checkpoint_resume_walkthrough.py
 python examples\safety_recovery_walkthrough.py --scenario all --approval approve
+python examples\multi_agent_walkthrough.py
 python -m pytest
 ```
 
@@ -74,6 +75,7 @@ python -m pytest
 ```powershell
 python examples\safety_recovery_walkthrough.py --scenario approval --approval reject
 python examples\safety_recovery_walkthrough.py --scenario recovery
+python examples\multi_agent_walkthrough.py --action-limit 1
 ```
 
 目前所有 walkthrough 都只使用合成資料與本機 deterministic Python 邏輯，不會呼叫 LLM、網路、真實工具或設備。

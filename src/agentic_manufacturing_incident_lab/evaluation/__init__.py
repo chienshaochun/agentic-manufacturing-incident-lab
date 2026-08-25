@@ -19,6 +19,10 @@ from agentic_manufacturing_incident_lab.evaluation.runner import (
     run_controlled_benchmark,
     run_phase7_benchmark,
 )
+from agentic_manufacturing_incident_lab.evaluation.rendering import (
+    render_benchmark_summary,
+    render_benchmark_trace,
+)
 
 __all__ = [
     "BenchmarkCase",
@@ -31,6 +35,8 @@ __all__ = [
     "build_phase7_benchmark_catalog",
     "build_specialist_failure_catalog",
     "evaluate_benchmark_run",
+    "render_benchmark_summary",
+    "render_benchmark_trace",
     "run_benchmark_case",
     "run_controlled_benchmark",
     "run_phase7_benchmark",

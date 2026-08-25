@@ -40,6 +40,10 @@ from agentic_manufacturing_incident_lab.runtime.executor import (
     ExecutionAttempt,
 )
 from agentic_manufacturing_incident_lab.runtime.run import InvestigationRun
+from agentic_manufacturing_incident_lab.recovery import (
+    RecoveryAssessment,
+    RecoveryDisposition,
+)
 from agentic_manufacturing_incident_lab.safety import (
     ApprovalDecision,
     ApprovalOutcome,
@@ -48,7 +52,7 @@ from agentic_manufacturing_incident_lab.safety import (
     SafetyDisposition,
 )
 
-CHECKPOINT_SCHEMA_VERSION = 2
+CHECKPOINT_SCHEMA_VERSION = 3
 CHECKPOINT_KIND = "agentic_manufacturing_investigation"
 
 
@@ -181,6 +185,9 @@ def _encode_run(run: InvestigationRun) -> dict[str, Any]:
         "memory_states": [
             _encode_working_memory(memory) for memory in run.memory_states
         ],
+        "recovery_assessments": [
+            _encode_recovery_assessment(item) for item in run.recovery_assessments
+        ],
         "safety_assessments": [
             _encode_safety_assessment(item) for item in run.safety_assessments
         ],
@@ -259,6 +266,22 @@ def _encode_action(action: Action) -> dict[str, Any]:
         "requested_at": action.requested_at.isoformat(),
         "risk": action.risk.value,
         "tool_name": action.tool_name,
+    }
+
+
+def _encode_recovery_assessment(
+    assessment: RecoveryAssessment,
+) -> dict[str, Any]:
+    return {
+        "action_id": assessment.action_id,
+        "alternative_parameters": dict(assessment.alternative_parameters),
+        "alternative_tool_name": assessment.alternative_tool_name,
+        "assessed_at": assessment.assessed_at.isoformat(),
+        "disposition": assessment.disposition.value,
+        "incident_id": assessment.incident_id,
+        "policy_name": assessment.policy_name,
+        "rationale": assessment.rationale,
+        "recovery_id": assessment.recovery_id,
     }
 
 
@@ -348,6 +371,7 @@ def _decode_run(data: dict[str, Any]) -> InvestigationRun:
             "executions",
             "incident",
             "memory_states",
+            "recovery_assessments",
             "safety_assessments",
             "task_states",
         },
@@ -370,6 +394,15 @@ def _decode_run(data: dict[str, Any]) -> InvestigationRun:
         memory_states=tuple(
             _decode_working_memory(_require_object(item, "working_memory"))
             for item in _require_list(data["memory_states"], "memory_states")
+        ),
+        recovery_assessments=tuple(
+            _decode_recovery_assessment(
+                _require_object(item, "recovery_assessment")
+            )
+            for item in _require_list(
+                data["recovery_assessments"],
+                "recovery_assessments",
+            )
         ),
         safety_assessments=tuple(
             _decode_safety_assessment(_require_object(item, "safety_assessment"))
@@ -561,6 +594,46 @@ def _decode_safety_assessment(data: dict[str, Any]) -> SafetyAssessment:
     )
 
 
+def _decode_recovery_assessment(data: dict[str, Any]) -> RecoveryAssessment:
+    _require_exact_keys(
+        data,
+        {
+            "action_id",
+            "alternative_parameters",
+            "alternative_tool_name",
+            "assessed_at",
+            "disposition",
+            "incident_id",
+            "policy_name",
+            "rationale",
+            "recovery_id",
+        },
+        "recovery_assessment",
+    )
+    alternative_tool_name = data["alternative_tool_name"]
+    if alternative_tool_name is not None:
+        alternative_tool_name = _require_string(
+            alternative_tool_name,
+            "alternative_tool_name",
+        )
+    return RecoveryAssessment(
+        recovery_id=_require_string(data["recovery_id"], "recovery_id"),
+        action_id=_require_string(data["action_id"], "action_id"),
+        incident_id=_require_string(data["incident_id"], "incident_id"),
+        policy_name=_require_string(data["policy_name"], "policy_name"),
+        disposition=_decode_enum(
+            RecoveryDisposition,
+            data["disposition"],
+            "disposition",
+        ),
+        rationale=_require_string(data["rationale"], "rationale"),
+        assessed_at=_decode_datetime(data["assessed_at"], "assessed_at"),
+        alternative_tool_name=alternative_tool_name,
+        alternative_parameters=_decode_scalar_mapping(
+            data["alternative_parameters"],
+            "alternative_parameters",
+        ),
+    )
 def _decode_approval_request(data: dict[str, Any]) -> ApprovalRequest:
     _require_exact_keys(
         data,

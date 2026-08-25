@@ -11,6 +11,7 @@ from agentic_manufacturing_incident_lab.runtime.executor import ActionExecutionR
 
 if TYPE_CHECKING:
     from agentic_manufacturing_incident_lab.agent.memory import WorkingMemory
+    from agentic_manufacturing_incident_lab.recovery import RecoveryAssessment
     from agentic_manufacturing_incident_lab.safety import (
         ApprovalDecision,
         ApprovalRequest,
@@ -30,6 +31,7 @@ class InvestigationRun:
     safety_assessments: tuple[SafetyAssessment, ...] = ()
     approval_requests: tuple[ApprovalRequest, ...] = ()
     approval_decisions: tuple[ApprovalDecision, ...] = ()
+    recovery_assessments: tuple[RecoveryAssessment, ...] = ()
 
     def __post_init__(self) -> None:
         task_states = tuple(self.task_states)
@@ -39,6 +41,7 @@ class InvestigationRun:
         safety_assessments = tuple(self.safety_assessments)
         approval_requests = tuple(self.approval_requests)
         approval_decisions = tuple(self.approval_decisions)
+        recovery_assessments = tuple(self.recovery_assessments)
         if not task_states:
             raise ValueError("task_states must contain at least one state")
         if task_states[0].status is not TaskStatus.CREATED:
@@ -64,6 +67,36 @@ class InvestigationRun:
             record.action.incident_id != self.incident.incident_id for record in executions
         ):
             raise ValueError("all executions must match the run incident")
+
+        recovery_ids = tuple(
+            assessment.recovery_id for assessment in recovery_assessments
+        )
+        recovered_action_ids = tuple(
+            assessment.action_id for assessment in recovery_assessments
+        )
+        if len(set(recovery_ids)) != len(recovery_ids):
+            raise ValueError("recovery assessments must have unique recovery_id values")
+        if len(set(recovered_action_ids)) != len(recovered_action_ids):
+            raise ValueError("each failed action may only have one recovery assessment")
+        executions_by_action_id = {
+            record.action.action_id: record for record in executions
+        }
+        if any(
+            assessment.incident_id != self.incident.incident_id
+            for assessment in recovery_assessments
+        ):
+            raise ValueError("all recovery assessments must match the run incident")
+        if any(
+            assessment.action_id not in executions_by_action_id
+            for assessment in recovery_assessments
+        ):
+            raise ValueError("recovery assessments must reference run executions")
+        if any(
+            executions_by_action_id[assessment.action_id].result.status.value
+            == "succeeded"
+            for assessment in recovery_assessments
+        ):
+            raise ValueError("recovery assessments must reference failed executions")
 
         observations = tuple(
             observation for record in executions for observation in record.observations
@@ -204,6 +237,7 @@ class InvestigationRun:
         object.__setattr__(self, "safety_assessments", safety_assessments)
         object.__setattr__(self, "approval_requests", approval_requests)
         object.__setattr__(self, "approval_decisions", approval_decisions)
+        object.__setattr__(self, "recovery_assessments", recovery_assessments)
 
     @property
     def final_state(self) -> TaskState:

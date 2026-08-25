@@ -17,6 +17,7 @@ from agentic_manufacturing_incident_lab.agent.memory import (
     prepare_action_memory,
     record_action_memory,
 )
+from agentic_manufacturing_incident_lab.domain.execution import ActionResultStatus
 from agentic_manufacturing_incident_lab.domain.models import Action, Evidence, Incident
 from agentic_manufacturing_incident_lab.domain.task import (
     TaskState,
@@ -28,6 +29,12 @@ from agentic_manufacturing_incident_lab.runtime import (
     ActionExecutor,
     InvestigationRun,
     RetryPolicy,
+)
+from agentic_manufacturing_incident_lab.recovery import (
+    RecoveryAssessment,
+    RecoveryDisposition,
+    RecoveryPolicy,
+    RuleBasedRecoveryPolicy,
 )
 from agentic_manufacturing_incident_lab.safety import (
     ApprovalDecision,
@@ -50,6 +57,7 @@ class SingleAgentRunner:
         "_action_limit",
         "_executor",
         "_policy",
+        "_recovery_policy",
         "_registry",
         "_safety_policy",
     )
@@ -62,6 +70,7 @@ class SingleAgentRunner:
         action_limit: int = 32,
         safety_policy: SafetyPolicy | None = None,
         retry_policy: RetryPolicy | None = None,
+        recovery_policy: RecoveryPolicy | None = None,
     ) -> None:
         if (
             isinstance(action_limit, bool)
@@ -74,6 +83,7 @@ class SingleAgentRunner:
         self._executor = ActionExecutor(registry, retry_policy=retry_policy)
         self._action_limit = action_limit
         self._safety_policy = safety_policy or RiskBasedSafetyPolicy()
+        self._recovery_policy = recovery_policy or RuleBasedRecoveryPolicy()
 
     def run(
         self,
@@ -116,6 +126,7 @@ class SingleAgentRunner:
             safety_assessments=[],
             approval_requests=[],
             approval_decisions=[],
+            recovery_assessments=[],
             pause_after_actions=pause_after_actions,
         )
 
@@ -142,6 +153,7 @@ class SingleAgentRunner:
             safety_assessments=list(partial_run.safety_assessments),
             approval_requests=list(partial_run.approval_requests),
             approval_decisions=list(partial_run.approval_decisions),
+            recovery_assessments=list(partial_run.recovery_assessments),
             pause_after_actions=pause_after_actions,
         )
 
@@ -173,6 +185,7 @@ class SingleAgentRunner:
         safety_assessments = list(waiting_run.safety_assessments)
         approval_requests = list(waiting_run.approval_requests)
         approval_decisions = list(waiting_run.approval_decisions)
+        recovery_assessments = list(waiting_run.recovery_assessments)
         decision_time = decided_at or (
             self._latest_time(
                 task_states,
@@ -181,6 +194,7 @@ class SingleAgentRunner:
                 safety_assessments,
                 approval_requests,
                 approval_decisions,
+                recovery_assessments,
             )
             + timedelta(seconds=1)
         )
@@ -209,6 +223,7 @@ class SingleAgentRunner:
                 safety_assessments=safety_assessments,
                 approval_requests=approval_requests,
                 approval_decisions=approval_decisions,
+                recovery_assessments=recovery_assessments,
             )
 
         investigating = transition_task(
@@ -232,6 +247,7 @@ class SingleAgentRunner:
             safety_assessments=safety_assessments,
             approval_requests=approval_requests,
             approval_decisions=approval_decisions,
+            recovery_assessments=recovery_assessments,
             pause_after_actions=pause_after_actions,
         )
 
@@ -246,6 +262,7 @@ class SingleAgentRunner:
         safety_assessments: list[SafetyAssessment],
         approval_requests: list[ApprovalRequest],
         approval_decisions: list[ApprovalDecision],
+        recovery_assessments: list[RecoveryAssessment],
         pause_after_actions: int | None,
     ) -> InvestigationRun:
         while True:
@@ -266,9 +283,67 @@ class SingleAgentRunner:
                     safety_assessments=safety_assessments,
                     approval_requests=approval_requests,
                     approval_decisions=approval_decisions,
+                    recovery_assessments=recovery_assessments,
                 )
 
-            decision = self._policy.decide(context)
+            decision = None
+            assessed_recovery_action_ids = {
+                assessment.action_id for assessment in recovery_assessments
+            }
+            if (
+                executions
+                and executions[-1].result.status is not ActionResultStatus.SUCCEEDED
+                and executions[-1].action.action_id
+                not in assessed_recovery_action_ids
+            ):
+                recovery = self._recovery_policy.assess(
+                    executions[-1],
+                    available_tools=self._registry.specs,
+                    prior_executions=tuple(executions),
+                    assessed_at=self._latest_time(
+                        task_states,
+                        executions,
+                        memory_states,
+                        safety_assessments,
+                        approval_requests,
+                        approval_decisions,
+                        recovery_assessments,
+                    )
+                    + timedelta(seconds=1),
+                )
+                recovery_assessments.append(recovery)
+                if recovery.disposition is RecoveryDisposition.SAFE_STOP:
+                    return self._stop_run(
+                        incident=incident,
+                        task_states=task_states,
+                        executions=executions,
+                        memory_states=memory_states,
+                        safety_assessments=safety_assessments,
+                        approval_requests=approval_requests,
+                        approval_decisions=approval_decisions,
+                        recovery_assessments=recovery_assessments,
+                        reason=f"Recovery policy stopped: {recovery.rationale}",
+                    )
+                if recovery.alternative_tool_name is None:
+                    return self._stop_run(
+                        incident=incident,
+                        task_states=task_states,
+                        executions=executions,
+                        memory_states=memory_states,
+                        safety_assessments=safety_assessments,
+                        approval_requests=approval_requests,
+                        approval_decisions=approval_decisions,
+                        recovery_assessments=recovery_assessments,
+                        reason="Recovery policy returned no alternative tool.",
+                    )
+                decision = ActionDecision(
+                    tool_name=recovery.alternative_tool_name,
+                    rationale=recovery.rationale,
+                    parameters=recovery.alternative_parameters,
+                )
+
+            if decision is None:
+                decision = self._policy.decide(context)
             if isinstance(decision, CompleteDecision):
                 return self._complete_run(
                     incident=incident,
@@ -278,6 +353,7 @@ class SingleAgentRunner:
                     safety_assessments=safety_assessments,
                     approval_requests=approval_requests,
                     approval_decisions=approval_decisions,
+                    recovery_assessments=recovery_assessments,
                     decision=decision,
                 )
             if isinstance(decision, StopDecision):
@@ -289,6 +365,7 @@ class SingleAgentRunner:
                     safety_assessments=safety_assessments,
                     approval_requests=approval_requests,
                     approval_decisions=approval_decisions,
+                    recovery_assessments=recovery_assessments,
                     reason=(
                         f"Planner stopped ({decision.reason.value}): "
                         f"{decision.rationale}"
@@ -303,6 +380,7 @@ class SingleAgentRunner:
                     safety_assessments=safety_assessments,
                     approval_requests=approval_requests,
                     approval_decisions=approval_decisions,
+                    recovery_assessments=recovery_assessments,
                     reason="Planner returned an unsupported decision type.",
                 )
             if memory_states[-1].step_budget.is_exhausted:
@@ -314,6 +392,7 @@ class SingleAgentRunner:
                     safety_assessments=safety_assessments,
                     approval_requests=approval_requests,
                     approval_decisions=approval_decisions,
+                    recovery_assessments=recovery_assessments,
                     reason=(
                         "Step budget exhausted before the planner produced a terminal "
                         "decision."
@@ -331,6 +410,7 @@ class SingleAgentRunner:
                     safety_assessments=safety_assessments,
                     approval_requests=approval_requests,
                     approval_decisions=approval_decisions,
+                    recovery_assessments=recovery_assessments,
                     reason=(
                         "Planner proposed a tool outside the runtime allowlist: "
                         f"{decision.tool_name}."
@@ -351,6 +431,7 @@ class SingleAgentRunner:
                     safety_assessments,
                     approval_requests,
                     approval_decisions,
+                    recovery_assessments,
                 )
                 + timedelta(seconds=1),
                 parameters=decision.parameters,
@@ -370,6 +451,7 @@ class SingleAgentRunner:
                     safety_assessments=safety_assessments,
                     approval_requests=approval_requests,
                     approval_decisions=approval_decisions,
+                    recovery_assessments=recovery_assessments,
                     reason=f"Safety policy denied action: {assessment.rationale}",
                 )
             if assessment.disposition is SafetyDisposition.REQUIRE_APPROVAL:
@@ -394,6 +476,7 @@ class SingleAgentRunner:
                     safety_assessments=safety_assessments,
                     approval_requests=approval_requests,
                     approval_decisions=approval_decisions,
+                    recovery_assessments=recovery_assessments,
                 )
 
             self._execute_action(action, executions, memory_states)
@@ -422,6 +505,11 @@ class SingleAgentRunner:
             for assessment in run.safety_assessments
         ):
             raise ValueError("runner safety policy must match checkpoint policy")
+        if any(
+            assessment.policy_name != self._recovery_policy.name
+            for assessment in run.recovery_assessments
+        ):
+            raise ValueError("runner recovery policy must match checkpoint policy")
 
     @staticmethod
     def _snapshot_run(
@@ -433,6 +521,7 @@ class SingleAgentRunner:
         safety_assessments: list[SafetyAssessment],
         approval_requests: list[ApprovalRequest],
         approval_decisions: list[ApprovalDecision],
+        recovery_assessments: list[RecoveryAssessment],
     ) -> InvestigationRun:
         return InvestigationRun(
             incident=incident,
@@ -442,6 +531,7 @@ class SingleAgentRunner:
             safety_assessments=tuple(safety_assessments),
             approval_requests=tuple(approval_requests),
             approval_decisions=tuple(approval_decisions),
+            recovery_assessments=tuple(recovery_assessments),
         )
 
     @staticmethod
@@ -462,6 +552,7 @@ class SingleAgentRunner:
         safety_assessments: list[SafetyAssessment],
         approval_requests: list[ApprovalRequest],
         approval_decisions: list[ApprovalDecision],
+        recovery_assessments: list[RecoveryAssessment],
         decision: CompleteDecision,
     ) -> InvestigationRun:
         known_observation_ids = {
@@ -478,6 +569,7 @@ class SingleAgentRunner:
                 safety_assessments=safety_assessments,
                 approval_requests=approval_requests,
                 approval_decisions=approval_decisions,
+                recovery_assessments=recovery_assessments,
                 reason=(
                     "Planner completion referenced observations that were not collected "
                     "during this investigation."
@@ -491,6 +583,7 @@ class SingleAgentRunner:
             safety_assessments,
             approval_requests,
             approval_decisions,
+            recovery_assessments,
         )
         memory_states.append(
             complete_working_memory(
@@ -521,6 +614,7 @@ class SingleAgentRunner:
             safety_assessments=tuple(safety_assessments),
             approval_requests=tuple(approval_requests),
             approval_decisions=tuple(approval_decisions),
+            recovery_assessments=tuple(recovery_assessments),
         )
 
     @classmethod
@@ -534,6 +628,7 @@ class SingleAgentRunner:
         safety_assessments: list[SafetyAssessment],
         approval_requests: list[ApprovalRequest],
         approval_decisions: list[ApprovalDecision],
+        recovery_assessments: list[RecoveryAssessment],
         reason: str,
     ) -> InvestigationRun:
         stopped = transition_task(
@@ -547,6 +642,7 @@ class SingleAgentRunner:
                 safety_assessments,
                 approval_requests,
                 approval_decisions,
+                recovery_assessments,
             )
             + timedelta(seconds=1),
         )
@@ -558,6 +654,7 @@ class SingleAgentRunner:
             safety_assessments=tuple(safety_assessments),
             approval_requests=tuple(approval_requests),
             approval_decisions=tuple(approval_decisions),
+            recovery_assessments=tuple(recovery_assessments),
         )
 
     @staticmethod
@@ -568,6 +665,7 @@ class SingleAgentRunner:
         safety_assessments: list[SafetyAssessment],
         approval_requests: list[ApprovalRequest],
         approval_decisions: list[ApprovalDecision],
+        recovery_assessments: list[RecoveryAssessment],
     ) -> datetime:
         timestamps = [task_states[-1].updated_at]
         timestamps.extend(record.result.completed_at for record in executions)
@@ -575,4 +673,5 @@ class SingleAgentRunner:
         timestamps.extend(item.assessed_at for item in safety_assessments)
         timestamps.extend(item.requested_at for item in approval_requests)
         timestamps.extend(item.decided_at for item in approval_decisions)
+        timestamps.extend(item.assessed_at for item in recovery_assessments)
         return max(timestamps)

@@ -1,6 +1,6 @@
 """Execute controlled cases and score multi-agent correctness and cost."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from agentic_manufacturing_incident_lab.agent import RuleBasedPlanner
 from agentic_manufacturing_incident_lab.collaboration import (
@@ -8,11 +8,14 @@ from agentic_manufacturing_incident_lab.collaboration import (
     DiagnosticAgent,
     MultiAgentRun,
     ReporterAgent,
+    SafetyReviewOutcome,
     SafetyReviewerAgent,
 )
 from agentic_manufacturing_incident_lab.evaluation.catalog import (
     BenchmarkCase,
+    SpecialistFault,
     build_controlled_benchmark_catalog,
+    build_phase7_benchmark_catalog,
 )
 from agentic_manufacturing_incident_lab.evaluation.contracts import (
     BenchmarkExpectation,
@@ -20,6 +23,37 @@ from agentic_manufacturing_incident_lab.evaluation.contracts import (
 )
 from agentic_manufacturing_incident_lab.simulation import SimulatedEnvironment
 from agentic_manufacturing_incident_lab.tools import build_diagnostic_registry
+
+
+class _RaisingDiagnostic:
+    def handle(self, request, *, incident, known_asset_ids):
+        raise RuntimeError("injected diagnostic specialist failure")
+
+
+class _InvalidDiagnostic:
+    def handle(self, request, *, incident, known_asset_ids):
+        return None
+
+
+class _RaisingSafetyReviewer:
+    def handle(self, request, *, diagnostic):
+        raise RuntimeError("injected safety reviewer failure")
+
+
+class _RaisingReporter:
+    def handle(self, request, *, diagnostic, safety_review):
+        raise RuntimeError("injected reporter failure")
+
+
+class _ContradictorySafetyReviewer:
+    def handle(self, request, *, diagnostic):
+        review = SafetyReviewerAgent().handle(request, diagnostic=diagnostic)
+        return replace(
+            review,
+            outcome=SafetyReviewOutcome.APPROVED,
+            rationale="Injected approval of an incomplete diagnostic run.",
+            findings=("Contradictory approval injected by benchmark.",),
+        )
 
 
 def _tool_call_count(run: MultiAgentRun) -> int:
@@ -211,14 +245,28 @@ def run_benchmark_case(case: BenchmarkCase) -> BenchmarkCaseResult:
     """Execute one case without exposing hidden scenario truth to specialists."""
     environment = SimulatedEnvironment(case.scenario)
     brief = environment.brief
+    diagnostic = DiagnosticAgent(
+        policy=RuleBasedPlanner(),
+        registry=build_diagnostic_registry(environment),
+        action_limit=case.action_limit,
+    )
+    safety_reviewer = SafetyReviewerAgent()
+    reporter = ReporterAgent()
+    if case.specialist_fault is SpecialistFault.DIAGNOSTIC_ERROR:
+        diagnostic = _RaisingDiagnostic()
+    elif case.specialist_fault is SpecialistFault.DIAGNOSTIC_INVALID_RESPONSE:
+        diagnostic = _InvalidDiagnostic()
+    elif case.specialist_fault is SpecialistFault.SAFETY_REVIEWER_ERROR:
+        safety_reviewer = _RaisingSafetyReviewer()
+    elif case.specialist_fault is SpecialistFault.REPORTER_ERROR:
+        reporter = _RaisingReporter()
+    elif case.specialist_fault is SpecialistFault.CONTRADICTORY_APPROVAL:
+        safety_reviewer = _ContradictorySafetyReviewer()
+
     run = CoordinatorAgent(
-        diagnostic=DiagnosticAgent(
-            policy=RuleBasedPlanner(),
-            registry=build_diagnostic_registry(environment),
-            action_limit=case.action_limit,
-        ),
-        safety_reviewer=SafetyReviewerAgent(),
-        reporter=ReporterAgent(),
+        diagnostic=diagnostic,
+        safety_reviewer=safety_reviewer,
+        reporter=reporter,
     ).run(
         incident=brief.incident,
         known_asset_ids=brief.known_asset_ids,
@@ -241,3 +289,8 @@ def run_controlled_benchmark(
     return BenchmarkSummary(
         results=tuple(run_benchmark_case(case) for case in selected_cases)
     )
+
+
+def run_phase7_benchmark() -> BenchmarkSummary:
+    """Execute all controlled behavior and specialist failure cases."""
+    return run_controlled_benchmark(build_phase7_benchmark_catalog())

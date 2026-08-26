@@ -42,7 +42,7 @@
 
 ## 目前進度
 
-Phase 8 已完成：除了 Phase 7 的 11 個 controlled behavior 與 Specialist failure cases，現在也能在 Streamlit 操作台執行單案、查看完整 Agent 履歷、比較全體 Benchmark，並下載 Markdown、JSON、CSV 與文字產物。整個 app 維持 deterministic、合成資料、只讀診斷與無 LLM 的明確邊界。
+Phase 8 已完成：除了 Phase 7 的 11 個 controlled behavior 與 Specialist failure cases，現在也能在中英雙語 Streamlit 操作台執行單案、查看完整 Agent 履歷、比較全體 Benchmark，並下載 Markdown、JSON、CSV 與文字產物。介面以中文說明提高展示可讀性，同時保留 Agent、Evidence、Handoff、Benchmark 與 `safe_stopped` 等英文技術詞彙；整個 app 維持 deterministic、合成資料、只讀診斷與無 LLM 的明確邊界。
 
 ## 本機手動演練
 

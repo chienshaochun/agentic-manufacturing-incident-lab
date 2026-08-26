@@ -10,7 +10,7 @@
 
 | 檔案 | 作用 |
 |---|---|
-| `streamlit_app.py` | Streamlit 入口、單案操作台、Benchmark Dashboard、詳細稽核面板與下載按鈕。 |
+| `streamlit_app.py` | 中英雙語 Streamlit 入口、單案操作台、Benchmark Dashboard、詳細稽核面板與下載按鈕。 |
 | `presentation/models.py` | 與 UI framework 無關、不可變的畫面資料模型。 |
 | `presentation/builders.py` | 將領域層的執行結果轉成卡片、表格與 trace 所需資料。 |
 | `presentation/exports.py` | 產生 Markdown、JSON、CSV 與文字交付物。 |
@@ -57,7 +57,7 @@ python -m streamlit run streamlit_app.py
 
 ### 建議手動展示流程
 
-1. 進入 `Incident Workbench`，先執行預設的 `isolated-station-seed-43`。
+1. 進入 `事件調查台 Incident Workbench`，先執行預設的 `isolated-station-seed-43`。
 2. 在 Handoffs 看 Coordinator 如何依序要求 Diagnostic、Safety Reviewer 與 Reporter 工作。
 3. 在 Actions & attempts 對照 Agent 的邏輯 Action 與實際 physical attempts。
 4. 在 Evidence & safety 確認結論引用哪些 observation，以及獨立安全審查是否核准。
@@ -65,7 +65,9 @@ python -m streamlit run streamlit_app.py
 6. 在 Raw trace 查看可重播、可稽核的完整文字紀錄。
 7. 下載 Markdown、JSON 或 TXT，展示人類與機器可讀的交付方式。
 8. 改跑 `reporter-exception-seed-43`，觀察 Reporter 故障被安全收斂，且既有 Evidence 與 Safety Review 沒有消失。
-9. 前往 `Benchmark Dashboard`，執行全部 11 案，確認正常、模糊、資源受限與故障注入案例全部通過既定驗收閘門。
+9. 前往 `基準測試 Benchmark Dashboard`，執行全部 11 案，確認正常、模糊、資源受限與故障注入案例全部通過既定驗收閘門。
+
+介面採用「中文說明優先、英文技術詞彙保留」的策略。例如 `工作流 Workflow`、`證據 Evidence`、`交接紀錄 Handoffs` 與 `安全停止 safe_stopped`。這讓中文面試展示更容易閱讀，也能直接對應 Agentic AI 的英文術語與原始 Audit trace。
 
 ## 執行與測試
 

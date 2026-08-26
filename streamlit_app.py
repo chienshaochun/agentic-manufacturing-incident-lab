@@ -63,6 +63,17 @@ def _current_case_result(case_id: str) -> BenchmarkCaseResult | None:
     return None
 
 
+def _run_full_benchmark() -> None:
+    with st.spinner("Running all controlled benchmark cases..."):
+        summary = run_phase7_benchmark()
+    st.session_state["benchmark_view"] = build_benchmark_presentation(summary)
+
+
+def _current_benchmark_view() -> BenchmarkPresentation | None:
+    view = st.session_state.get("benchmark_view")
+    return view if isinstance(view, BenchmarkPresentation) else None
+
+
 def _render_case_status(view: CasePresentation) -> None:
     if view.passed and view.workflow_status == "completed":
         st.success("Investigation completed with approved, evidence-bound output.")
@@ -212,7 +223,38 @@ def _incident_workbench() -> None:
 
 def _benchmark_dashboard() -> None:
     st.title("Benchmark Dashboard")
-    st.info("The complete 11-case dashboard is connected in the next UI stage.")
+    st.caption(
+        "Evaluate normal, ambiguous, resource-limited, and injected-failure "
+        "paths against the same deterministic acceptance gates."
+    )
+    if st.button(
+        "Run full benchmark",
+        type="primary",
+        width="stretch",
+        icon=":material/speed:",
+    ):
+        _run_full_benchmark()
+
+    view = _current_benchmark_view()
+    if view is None:
+        st.info("Run the benchmark to compare all 11 controlled cases.")
+        return
+
+    _metric_grid(view.metrics)
+    if all(row.passed for row in view.rows):
+        st.success("All controlled correctness, safety, and resource gates passed.")
+    else:
+        failed_count = sum(not row.passed for row in view.rows)
+        st.error(f"{failed_count} benchmark case(s) did not pass every gate.")
+
+    st.subheader("Case comparison")
+    st.dataframe(
+        [asdict(row) for row in view.rows],
+        hide_index=True,
+        width="stretch",
+    )
+    with st.expander("Aggregate text summary"):
+        st.code(view.summary_text, language="text")
 
 
 def _about() -> None:

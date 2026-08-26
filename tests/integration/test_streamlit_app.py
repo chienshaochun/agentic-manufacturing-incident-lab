@@ -54,6 +54,24 @@ def test_reporter_failure_shows_preserved_review_and_failure_panel() -> None:
     assert any("stage: reporting" in code.value for code in app.code)
 
 
+def test_benchmark_dashboard_runs_all_controlled_cases() -> None:
+    app = load_app()
+
+    app.radio[0].set_value("Benchmark Dashboard").run()
+    assert app.title[0].value == "Benchmark Dashboard"
+    assert app.button[0].label == "Run full benchmark"
+
+    app.button[0].click().run(timeout=60)
+
+    assert not app.exception
+    assert any(metric.label == "Cases" and metric.value == "11" for metric in app.metric)
+    assert any(metric.label == "Passed" and metric.value == "11" for metric in app.metric)
+    assert len(app.dataframe) == 1
+    assert len(app.dataframe[0].value) == 11
+    assert any("All controlled" in success.value for success in app.success)
+    assert any("- cases: 11" in code.value for code in app.code)
+
+
 def test_about_page_explains_deterministic_no_llm_boundary() -> None:
     app = load_app()
 

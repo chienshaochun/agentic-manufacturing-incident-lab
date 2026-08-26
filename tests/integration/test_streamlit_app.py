@@ -7,7 +7,7 @@ APP_PATH = Path(__file__).parents[2] / "streamlit_app.py"
 
 
 def load_app() -> AppTest:
-    app = AppTest.from_file(str(APP_PATH), default_timeout=15)
+    app = AppTest.from_file(str(APP_PATH), default_timeout=30)
     app.run()
     assert not app.exception
     return app
@@ -32,7 +32,26 @@ def test_run_button_executes_default_case_and_displays_metrics() -> None:
     assert any(metric.value == "completed" for metric in app.metric)
     assert any(metric.label == "Benchmark" for metric in app.metric)
     assert any(metric.value == "PASS" for metric in app.metric)
-    assert len(app.success) == 1
+    assert any("Investigation completed" in success.value for success in app.success)
+    assert len(app.get("tab")) == 5
+    assert len(app.dataframe) == 3
+    assert any(
+        "Benchmark trace: isolated-station-seed-43" in code.value
+        for code in app.code
+    )
+
+
+def test_reporter_failure_shows_preserved_review_and_failure_panel() -> None:
+    app = load_app()
+
+    app.selectbox[0].set_value("reporter-exception-seed-43").run()
+    app.button[0].click().run()
+
+    assert not app.exception
+    assert any("contained" in warning.value for warning in app.warning)
+    assert any("Safety outcome: approved" in success.value for success in app.success)
+    assert any("No formal report" in info.value for info in app.info)
+    assert any("stage: reporting" in code.value for code in app.code)
 
 
 def test_about_page_explains_deterministic_no_llm_boundary() -> None:

@@ -83,6 +83,87 @@ def _render_case_details(view: CasePresentation) -> None:
     st.subheader("Investigation overview")
     _metric_grid(view.metrics)
     _render_case_status(view)
+    handoff_tab, action_tab, evidence_tab, outcome_tab, trace_tab = st.tabs(
+        (
+            "Handoffs",
+            "Actions & attempts",
+            "Evidence & safety",
+            "Report & failures",
+            "Raw trace",
+        )
+    )
+
+    with handoff_tab:
+        st.markdown("#### Coordinator handoff ledger")
+        st.caption(
+            "Every request and response crossing an Agent responsibility boundary."
+        )
+        st.dataframe(
+            [asdict(handoff) for handoff in view.handoffs],
+            hide_index=True,
+            width="stretch",
+        )
+
+    with action_tab:
+        st.markdown("#### Diagnostic actions and physical attempts")
+        st.caption(
+            "One logical Action may contain multiple physical attempts when retrying."
+        )
+        if view.action_attempts:
+            st.dataframe(
+                [asdict(attempt) for attempt in view.action_attempts],
+                hide_index=True,
+                width="stretch",
+            )
+        else:
+            st.info("DiagnosticAgent returned no executable work product.")
+
+    with evidence_tab:
+        st.markdown("#### Evidence")
+        if view.evidence:
+            st.dataframe(
+                [asdict(evidence) for evidence in view.evidence],
+                hide_index=True,
+                width="stretch",
+            )
+        else:
+            st.info("No evidence claim was created for this case.")
+
+        st.markdown("#### Independent safety review")
+        if view.safety is None:
+            st.warning("Safety Reviewer did not return a work product.")
+        else:
+            if view.safety.outcome == "approved":
+                st.success(f"Safety outcome: {view.safety.outcome}")
+            else:
+                st.warning(f"Safety outcome: {view.safety.outcome}")
+            st.write(view.safety.rationale)
+            for finding in view.safety.findings:
+                st.markdown(f"- {finding}")
+
+    with outcome_tab:
+        st.markdown("#### Evidence-bound report")
+        if view.report is None:
+            st.info("No formal report was generated for this run.")
+        else:
+            st.markdown(f"**{view.report.title}**")
+            st.write(view.report.executive_summary)
+            st.markdown(f"**Conclusion:** {view.report.conclusion}")
+            st.caption(f"Evidence records: {view.report.evidence_ids}")
+
+        st.markdown("#### Collaboration failures")
+        if view.failures:
+            st.dataframe(
+                [asdict(failure) for failure in view.failures],
+                hide_index=True,
+                width="stretch",
+            )
+        else:
+            st.success("No collaboration failure was recorded.")
+
+    with trace_tab:
+        st.markdown("#### Complete deterministic audit trace")
+        st.code(view.trace_text, language="text", line_numbers=True)
 
 
 def _incident_workbench() -> None:

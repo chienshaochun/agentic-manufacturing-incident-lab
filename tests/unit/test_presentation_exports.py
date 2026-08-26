@@ -39,10 +39,10 @@ def test_case_report_markdown_handles_completed_and_missing_report() -> None:
     completed = case_report_markdown(view)
     contained = case_report_markdown(replace(view, report=None))
 
-    assert "# Investigation report: INC-CONNECTIVITY-0043" in completed
-    assert "## Evidence" in completed
-    assert "**Conclusion:**" in completed
-    assert "No formal report was generated" in contained
+    assert "# 事件調查報告：INC-CONNECTIVITY-0043" in completed
+    assert "## 證據 Evidence" in completed
+    assert "**結論：**" in completed
+    assert "本次執行沒有產生正式報告" in contained
 
 
 def test_benchmark_exports_have_all_cases_and_stable_columns() -> None:

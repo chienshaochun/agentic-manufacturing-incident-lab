@@ -18,6 +18,11 @@ from agentic_manufacturing_incident_lab.presentation.models import (
     ReportView,
     SafetyView,
 )
+from agentic_manufacturing_incident_lab.presentation.localization import (
+    localize_benchmark_summary,
+    localize_text,
+    localize_trace,
+)
 
 
 def _case_metrics(result: BenchmarkCaseResult) -> tuple[MetricCard, ...]:
@@ -72,7 +77,7 @@ def _handoffs(result: BenchmarkCaseResult) -> tuple[HandoffView, ...]:
             sender=handoff.sender.value,
             recipient=handoff.recipient.value,
             kind=handoff.kind.value,
-            purpose=handoff.purpose,
+            purpose=localize_text(handoff.purpose),
             reply_to=handoff.in_reply_to or "",
         )
         for index, handoff in enumerate(result.run.ledger.handoffs, start=1)
@@ -88,7 +93,7 @@ def _action_attempts(result: BenchmarkCaseResult) -> tuple[ActionAttemptView, ..
         start=1,
     ):
         observation_text = " | ".join(
-            f"{observation.summary} values={dict(observation.values)}"
+            f"{localize_text(observation.summary)} values={dict(observation.values)}"
             for observation in record.observations
         )
         if not record.attempts:
@@ -99,7 +104,7 @@ def _action_attempts(result: BenchmarkCaseResult) -> tuple[ActionAttemptView, ..
                     tool=record.action.tool_name,
                     parameters=str(dict(record.action.parameters)),
                     risk=record.action.risk.value,
-                    rationale=record.action.rationale,
+                    rationale=localize_text(record.action.rationale),
                     attempt=None,
                     status=record.result.status.value,
                     error_code=record.result.error_code or "",
@@ -115,7 +120,7 @@ def _action_attempts(result: BenchmarkCaseResult) -> tuple[ActionAttemptView, ..
                     tool=record.action.tool_name,
                     parameters=str(dict(record.action.parameters)),
                     risk=record.action.risk.value,
-                    rationale=record.action.rationale,
+                    rationale=localize_text(record.action.rationale),
                     attempt=attempt.attempt_number,
                     status=attempt.status.value,
                     error_code=attempt.error_code or "",
@@ -133,7 +138,7 @@ def _evidence(result: BenchmarkCaseResult) -> tuple[EvidenceView, ...]:
     return tuple(
         EvidenceView(
             evidence_id=evidence.evidence_id,
-            claim=evidence.claim,
+            claim=localize_text(evidence.claim),
             confidence=evidence.confidence,
             observation_ids=", ".join(evidence.observation_ids),
         )
@@ -146,8 +151,10 @@ def _safety(result: BenchmarkCaseResult) -> SafetyView | None:
         return None
     return SafetyView(
         outcome=result.run.safety_review.outcome.value,
-        rationale=result.run.safety_review.rationale,
-        findings=result.run.safety_review.findings,
+        rationale=localize_text(result.run.safety_review.rationale),
+        findings=tuple(
+            localize_text(finding) for finding in result.run.safety_review.findings
+        ),
     )
 
 
@@ -157,9 +164,9 @@ def _report(result: BenchmarkCaseResult) -> ReportView | None:
     report = result.run.report.report
     return ReportView(
         report_id=report.report_id,
-        title=report.title,
-        executive_summary=report.executive_summary,
-        conclusion=report.conclusion,
+        title=localize_text(report.title),
+        executive_summary=localize_text(report.executive_summary),
+        conclusion=localize_text(report.conclusion),
         evidence_ids=", ".join(report.evidence_ids),
     )
 
@@ -172,7 +179,7 @@ def _failures(result: BenchmarkCaseResult) -> tuple[FailureView, ...]:
             role=failure.role.value,
             kind=failure.kind.value,
             request_id=failure.related_request_id,
-            detail=failure.detail,
+            detail=localize_text(failure.detail),
         )
         for failure in result.run.failures
     )
@@ -199,7 +206,7 @@ def build_case_presentation(result: BenchmarkCaseResult) -> CasePresentation:
         safety=_safety(result),
         report=_report(result),
         failures=_failures(result),
-        trace_text=render_benchmark_trace(result),
+        trace_text=localize_trace(render_benchmark_trace(result)),
     )
 
 
@@ -256,5 +263,5 @@ def build_benchmark_presentation(
     return BenchmarkPresentation(
         metrics=metrics,
         rows=rows,
-        summary_text=render_benchmark_summary(summary),
+        summary_text=localize_benchmark_summary(render_benchmark_summary(summary)),
     )

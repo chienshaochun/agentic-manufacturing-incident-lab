@@ -34,7 +34,7 @@ def test_completed_case_presentation_contains_all_ui_sections() -> None:
     assert view.safety is not None
     assert view.safety.outcome == "approved"
     assert view.report is not None
-    assert "isolated to ST-02" in view.report.conclusion
+    assert "隔離在 ST-02" in view.report.conclusion
     assert view.failures == ()
 
 
@@ -90,7 +90,7 @@ def test_benchmark_presentation_contains_aggregate_cards_and_rows() -> None:
     assert len(view.rows) == 11
     assert all(row.passed for row in view.rows)
     assert view.rows[-1].failure == "conflicting_result"
-    assert "- all passed: yes" in view.summary_text
+    assert "- 是否全部通過： yes" in view.summary_text
 
 
 def test_presentation_models_are_serializable_with_dataclasses_asdict() -> None:

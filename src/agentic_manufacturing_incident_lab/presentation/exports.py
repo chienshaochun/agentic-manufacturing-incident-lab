@@ -35,15 +35,15 @@ def benchmark_csv(view: BenchmarkPresentation) -> str:
 def case_report_markdown(view: CasePresentation) -> str:
     """Build a concise human-readable incident artifact from grounded output."""
     lines = [
-        f"# Investigation report: {view.incident_id}",
+        f"# 事件調查報告：{view.incident_id}",
         "",
-        f"- Benchmark case: `{view.case_id}`",
-        f"- Scenario: `{view.scenario_id}` (seed `{view.seed}`)",
-        f"- Workflow status: `{view.workflow_status}`",
-        f"- Diagnostic status: `{view.diagnostic_status}`",
-        f"- Acceptance result: `{'PASS' if view.passed else 'FAIL'}`",
+        f"- Benchmark 案例：`{view.case_id}`",
+        f"- 情境 Scenario：`{view.scenario_id}`（seed `{view.seed}`）",
+        f"- 工作流狀態：`{view.workflow_status}`",
+        f"- 診斷狀態：`{view.diagnostic_status}`",
+        f"- 驗收結果：`{'PASS' if view.passed else 'FAIL'}`",
         "",
-        "## Evidence",
+        "## 證據 Evidence",
         "",
     ]
     if view.evidence:
@@ -51,28 +51,28 @@ def case_report_markdown(view: CasePresentation) -> str:
             lines.extend(
                 (
                     f"- **{evidence.evidence_id}** — {evidence.claim}",
-                    f"  - Confidence: `{evidence.confidence:.2f}`",
-                    f"  - Observations: {evidence.observation_ids}",
+                    f"  - 信心值：`{evidence.confidence:.2f}`",
+                    f"  - 引用的 Observations：{evidence.observation_ids}",
                 )
             )
     else:
-        lines.append("No evidence claim was produced.")
+        lines.append("本次執行沒有產生 Evidence claim。")
 
-    lines.extend(("", "## Safety review", ""))
+    lines.extend(("", "## 安全審查 Safety Review", ""))
     if view.safety is None:
-        lines.append("No Safety Reviewer work product was returned.")
+        lines.append("Safety Reviewer 沒有回傳工作產物。")
     else:
         lines.extend(
             (
-                f"- Outcome: `{view.safety.outcome}`",
-                f"- Rationale: {view.safety.rationale}",
+                f"- 審查結果：`{view.safety.outcome}`",
+                f"- 審查理由：{view.safety.rationale}",
             )
         )
-        lines.extend(f"- Finding: {finding}" for finding in view.safety.findings)
+        lines.extend(f"- 審查發現：{finding}" for finding in view.safety.findings)
 
-    lines.extend(("", "## Formal report", ""))
+    lines.extend(("", "## 正式報告", ""))
     if view.report is None:
-        lines.append("No formal report was generated for this run.")
+        lines.append("本次執行沒有產生正式報告。")
     else:
         lines.extend(
             (
@@ -80,13 +80,13 @@ def case_report_markdown(view: CasePresentation) -> str:
                 "",
                 view.report.executive_summary,
                 "",
-                f"**Conclusion:** {view.report.conclusion}",
+                f"**結論：** {view.report.conclusion}",
                 "",
-                f"**Evidence records:** {view.report.evidence_ids}",
+                f"**引用的 Evidence：** {view.report.evidence_ids}",
             )
         )
 
-    lines.extend(("", "## Collaboration failures", ""))
+    lines.extend(("", "## 協作失敗 Collaboration failures", ""))
     if view.failures:
         for failure in view.failures:
             lines.append(
@@ -94,5 +94,5 @@ def case_report_markdown(view: CasePresentation) -> str:
                 f"{failure.kind}: {failure.detail}"
             )
     else:
-        lines.append("No collaboration failure was recorded.")
+        lines.append("沒有記錄到 Agent 協作失敗。")
     return "\n".join(lines) + "\n"

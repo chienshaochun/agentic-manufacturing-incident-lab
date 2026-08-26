@@ -36,7 +36,7 @@ def test_run_button_executes_default_case_and_displays_metrics() -> None:
     assert len(app.get("tab")) == 5
     assert len(app.dataframe) == 3
     assert any(
-        "Benchmark trace: isolated-station-seed-43" in code.value
+        "Benchmark 稽核軌跡： isolated-station-seed-43" in code.value
         for code in app.code
     )
 
@@ -51,7 +51,7 @@ def test_reporter_failure_shows_preserved_review_and_failure_panel() -> None:
     assert any("安全收斂" in warning.value for warning in app.warning)
     assert any("Safety outcome：approved" in success.value for success in app.success)
     assert any("沒有產生正式報告" in info.value for info in app.info)
-    assert any("stage: reporting" in code.value for code in app.code)
+    assert any("階段： reporting" in code.value for code in app.code)
 
 
 def test_benchmark_dashboard_runs_all_controlled_cases() -> None:
@@ -69,7 +69,7 @@ def test_benchmark_dashboard_runs_all_controlled_cases() -> None:
     assert len(app.dataframe) == 1
     assert len(app.dataframe[0].value) == 11
     assert any("所有案例" in success.value for success in app.success)
-    assert any("- cases: 11" in code.value for code in app.code)
+    assert any("- 案例數： 11" in code.value for code in app.code)
 
 
 def test_about_page_explains_deterministic_no_llm_boundary() -> None:

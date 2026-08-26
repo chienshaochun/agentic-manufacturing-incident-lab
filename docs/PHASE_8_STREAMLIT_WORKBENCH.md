@@ -13,11 +13,13 @@
 | `streamlit_app.py` | 中英雙語 Streamlit 入口、單案操作台、Benchmark Dashboard、詳細稽核面板與下載按鈕。 |
 | `presentation/models.py` | 與 UI framework 無關、不可變的畫面資料模型。 |
 | `presentation/builders.py` | 將領域層的執行結果轉成卡片、表格與 trace 所需資料。 |
+| `presentation/localization.py` | 將受控案例的調查敘述轉成中文，同時保留 ID、工具名稱、狀態值與 schema 契約。 |
 | `presentation/exports.py` | 產生 Markdown、JSON、CSV 與文字交付物。 |
 | `requirements.txt` | 供 Streamlit Community Cloud 安裝本專案與 Streamlit。 |
 | `.streamlit/config.toml` | 操作台配色與 headless server 設定。 |
 | `tests/unit/test_presentation_builders.py` | 驗證領域結果轉換成 UI view model 的契約。 |
 | `tests/unit/test_presentation_exports.py` | 驗證下載檔內容與欄位穩定性。 |
+| `tests/unit/test_presentation_localization.py` | 驗證動態工作站文字、trace 與 Benchmark 摘要的中文轉換。 |
 | `tests/integration/test_streamlit_app.py` | 用 AppTest 模擬切頁、選案例、按鈕與畫面結果。 |
 
 ## 關鍵程式碼解釋
@@ -41,6 +43,12 @@ Action 是 Agent 決定要做的一個邏輯檢查；Attempt 是工具執行器�
 ### 報告只能使用已存在的證據
 
 Markdown 報告不是再次自由生成文字，而是由 `CasePresentation` 的 Evidence、Safety Review 與正式 Report 組合。Reporter 沒有產物時，下載報告也會明確標示沒有正式報告，不會自行補造結論。
+
+### 中文化放在展示邊界
+
+核心 domain 仍輸出固定的英文 enum、ID 與受控文字，`presentation/localization.py` 再把人類需要閱讀的敘述轉成中文。因此中文化不會改變 Agent 決策、Evidence grounding、Benchmark 正確答案或 JSON schema；它只改變操作台與匯出產物的表達方式。這相當於在穩定的控制訊號與操作員之間加入一層中文 HMI 轉接器。
+
+目前中文化涵蓋調查理由、Observation 摘要、Evidence claim、Safety Review、正式 Report、協作失敗、Raw trace、Benchmark 摘要與 Markdown 報告。案例 ID、Incident ID、Observation ID、Evidence ID、工具名稱、狀態值和 JSON 欄位名稱刻意保留英文，以維持可追蹤與機器可讀性。
 
 ## 如何具體操作
 
@@ -67,7 +75,7 @@ python -m streamlit run streamlit_app.py
 8. 改跑 `reporter-exception-seed-43`，觀察 Reporter 故障被安全收斂，且既有 Evidence 與 Safety Review 沒有消失。
 9. 前往 `基準測試 Benchmark Dashboard`，執行全部 11 案，確認正常、模糊、資源受限與故障注入案例全部通過既定驗收閘門。
 
-介面採用「中文說明優先、英文技術詞彙保留」的策略。例如 `工作流 Workflow`、`證據 Evidence`、`交接紀錄 Handoffs` 與 `安全停止 safe_stopped`。這讓中文面試展示更容易閱讀，也能直接對應 Agentic AI 的英文術語與原始 Audit trace。
+介面與最終調查產物採用「中文說明優先、英文技術識別保留」的策略。例如 `工作流 Workflow`、`證據 Evidence`、`交接紀錄 Handoffs` 與 `安全停止 safe_stopped`。這讓中文面試展示更容易閱讀，也能直接對應 Agentic AI 術語與原始資料契約。
 
 ## 執行與測試
 
@@ -95,6 +103,7 @@ python examples\benchmark_walkthrough.py
 - 工具只讀取模擬環境，不會連接 PLC、MES、機台、網路設備或客戶系統。
 - Agent 角色以同一個 Python process 依序協作，不是跨服務、跨主機的平行 Agent runtime。
 - Benchmark 的 11 個案例驗證已知邊界，不等於涵蓋所有現場故障。
+- 中文轉換表涵蓋目前的受控案例；未來加入新的 domain 敘述時，需要同步加入翻譯與測試。
 - App 是教學與面試展示用 prototype，不是可直接上線的生產監控系統。
 
 ## 面試時如何解釋

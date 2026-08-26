@@ -1,7 +1,6 @@
 """Interactive Streamlit workbench for the controlled incident lab."""
 
 from dataclasses import asdict
-import json
 
 import streamlit as st
 
@@ -14,8 +13,12 @@ from agentic_manufacturing_incident_lab.evaluation import (
 from agentic_manufacturing_incident_lab.presentation import (
     BenchmarkPresentation,
     CasePresentation,
+    benchmark_csv,
+    benchmark_json,
     build_benchmark_presentation,
     build_case_presentation,
+    case_json,
+    case_report_markdown,
 )
 
 
@@ -176,6 +179,33 @@ def _render_case_details(view: CasePresentation) -> None:
         st.markdown("#### Complete deterministic audit trace")
         st.code(view.trace_text, language="text", line_numbers=True)
 
+    st.subheader("Download investigation artifacts")
+    report_column, json_column, trace_column = st.columns(3)
+    report_column.download_button(
+        "Download report (.md)",
+        data=case_report_markdown(view),
+        file_name=f"{view.case_id}-report.md",
+        mime="text/markdown",
+        on_click="ignore",
+        width="stretch",
+    )
+    json_column.download_button(
+        "Download structured result (.json)",
+        data=case_json(view),
+        file_name=f"{view.case_id}-result.json",
+        mime="application/json",
+        on_click="ignore",
+        width="stretch",
+    )
+    trace_column.download_button(
+        "Download audit trace (.txt)",
+        data=view.trace_text,
+        file_name=f"{view.case_id}-trace.txt",
+        mime="text/plain",
+        on_click="ignore",
+        width="stretch",
+    )
+
 
 def _incident_workbench() -> None:
     st.title("Manufacturing Incident Workbench")
@@ -255,6 +285,33 @@ def _benchmark_dashboard() -> None:
     )
     with st.expander("Aggregate text summary"):
         st.code(view.summary_text, language="text")
+
+    st.subheader("Download benchmark artifacts")
+    json_column, csv_column, text_column = st.columns(3)
+    json_column.download_button(
+        "Download benchmark (.json)",
+        data=benchmark_json(view),
+        file_name="phase-7-benchmark.json",
+        mime="application/json",
+        on_click="ignore",
+        width="stretch",
+    )
+    csv_column.download_button(
+        "Download case table (.csv)",
+        data=benchmark_csv(view),
+        file_name="phase-7-benchmark.csv",
+        mime="text/csv",
+        on_click="ignore",
+        width="stretch",
+    )
+    text_column.download_button(
+        "Download summary (.txt)",
+        data=view.summary_text,
+        file_name="phase-7-benchmark.txt",
+        mime="text/plain",
+        on_click="ignore",
+        width="stretch",
+    )
 
 
 def _about() -> None:

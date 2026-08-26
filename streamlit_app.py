@@ -1,0 +1,176 @@
+"""Interactive Streamlit workbench for the controlled incident lab."""
+
+from dataclasses import asdict
+import json
+
+import streamlit as st
+
+from agentic_manufacturing_incident_lab.evaluation import (
+    BenchmarkCaseResult,
+    build_phase7_benchmark_catalog,
+    run_benchmark_case,
+    run_phase7_benchmark,
+)
+from agentic_manufacturing_incident_lab.presentation import (
+    BenchmarkPresentation,
+    CasePresentation,
+    build_benchmark_presentation,
+    build_case_presentation,
+)
+
+
+CASE_LABELS = {
+    "isolated-station-seed-42": "Isolated station fault — ST-01",
+    "isolated-station-seed-43": "Isolated station fault — ST-02",
+    "isolated-station-seed-44": "Isolated station fault — ST-03",
+    "shared-infrastructure-seed-73": "Shared infrastructure ambiguity",
+    "telemetry-path-seed-91": "Telemetry-path ambiguity",
+    "action-budget-safe-stop-seed-43": "Action budget safe stop",
+    "diagnostic-exception-seed-43": "Diagnostic Agent exception",
+    "diagnostic-invalid-response-seed-43": "Diagnostic invalid response",
+    "safety-reviewer-exception-seed-43": "Safety Reviewer exception",
+    "reporter-exception-seed-43": "Reporter Agent exception",
+    "contradictory-approval-seed-43": "Contradictory safety approval",
+}
+
+
+def _metric_grid(metrics) -> None:
+    columns = st.columns(4)
+    for index, metric in enumerate(metrics):
+        columns[index % len(columns)].metric(
+            metric.label,
+            metric.value,
+            help=metric.help_text,
+            border=True,
+        )
+
+
+def _case_lookup():
+    return {case.case_id: case for case in build_phase7_benchmark_catalog()}
+
+
+def _run_selected_case(case_id: str) -> None:
+    case = _case_lookup()[case_id]
+    with st.spinner("Running deterministic multi-agent investigation..."):
+        result = run_benchmark_case(case)
+    st.session_state["case_result"] = result
+
+
+def _current_case_result(case_id: str) -> BenchmarkCaseResult | None:
+    result = st.session_state.get("case_result")
+    if isinstance(result, BenchmarkCaseResult) and result.case_id == case_id:
+        return result
+    return None
+
+
+def _render_case_status(view: CasePresentation) -> None:
+    if view.passed and view.workflow_status == "completed":
+        st.success("Investigation completed with approved, evidence-bound output.")
+    elif view.passed and view.failures:
+        st.warning(
+            "The workflow safely contained the injected collaboration failure."
+        )
+    elif view.passed:
+        st.info(
+            "The workflow safely stopped because the available evidence was "
+            "insufficient for a report."
+        )
+    else:
+        st.error("The run did not satisfy the controlled benchmark expectation.")
+
+
+def _render_case_details(view: CasePresentation) -> None:
+    st.subheader("Investigation overview")
+    _metric_grid(view.metrics)
+    _render_case_status(view)
+
+
+def _incident_workbench() -> None:
+    st.title("Manufacturing Incident Workbench")
+    st.caption(
+        "Run one controlled incident through Coordinator, Diagnostic, "
+        "Safety Reviewer, and Reporter roles."
+    )
+    cases = _case_lookup()
+    case_ids = tuple(cases)
+    default_index = case_ids.index("isolated-station-seed-43")
+    selected_id = st.selectbox(
+        "Benchmark case",
+        options=case_ids,
+        index=default_index,
+        format_func=lambda case_id: CASE_LABELS[case_id],
+        help="Each case binds a deterministic scenario to an expected safe outcome.",
+    )
+    selected = cases[selected_id]
+    incident = selected.scenario.incident
+    st.markdown(f"**Incident:** `{incident.incident_id}` — {incident.title}")
+    st.markdown(
+        f"**Asset:** `{incident.asset_id}` · **Severity:** `{incident.severity.value}`"
+    )
+    st.markdown(f"**Goal:** {incident.goal}")
+    st.caption(
+        f"Scenario: {selected.scenario.scenario_id} · seed={selected.scenario.seed} "
+        f"· action limit={selected.action_limit} · fault profile="
+        f"{selected.specialist_fault.value}"
+    )
+
+    if st.button(
+        "Run investigation",
+        type="primary",
+        width="stretch",
+        icon=":material/play_arrow:",
+    ):
+        _run_selected_case(selected_id)
+
+    result = _current_case_result(selected_id)
+    if result is None:
+        st.info("Select a case and run the investigation to view its results.")
+        return
+    _render_case_details(build_case_presentation(result))
+
+
+def _benchmark_dashboard() -> None:
+    st.title("Benchmark Dashboard")
+    st.info("The complete 11-case dashboard is connected in the next UI stage.")
+
+
+def _about() -> None:
+    st.title("About this lab")
+    st.markdown(
+        """
+This is a deterministic learning lab for safe Agentic AI in manufacturing
+incident response. It uses synthetic scenarios, bounded tools, structured
+handoffs, independent safety review, evidence-bound reports, and controlled
+benchmarks.
+
+The current planner is rule-based. No LLM, external API, production equipment,
+or confidential factory data is used.
+"""
+    )
+
+
+def main() -> None:
+    st.set_page_config(
+        page_title="Agentic Incident Lab",
+        page_icon=":material/precision_manufacturing:",
+        layout="wide",
+    )
+    st.sidebar.title("Agentic Incident Lab")
+    page = st.sidebar.radio(
+        "Workspace",
+        ("Incident Workbench", "Benchmark Dashboard", "About"),
+    )
+    st.sidebar.caption(
+        "Deterministic · synthetic data · read-only diagnostics · no LLM"
+    )
+
+    if page == "Incident Workbench":
+        _incident_workbench()
+    elif page == "Benchmark Dashboard":
+        _benchmark_dashboard()
+    else:
+        _about()
+
+
+if __name__ == "__main__":
+    main()

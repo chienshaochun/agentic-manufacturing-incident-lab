@@ -39,6 +39,7 @@ CASE_LABELS = {
 WORKBENCH_PAGE = "事件調查台 Incident Workbench"
 BENCHMARK_PAGE = "基準測試 Benchmark Dashboard"
 ABOUT_PAGE = "關於專案 About"
+APP_RELEASE = "中文調查產物 v1"
 
 
 def _metric_grid(metrics) -> None:
@@ -382,6 +383,7 @@ def main() -> None:
     st.sidebar.caption(
         "可重播 · 合成資料 · 只讀診斷 · 無 LLM"
     )
+    st.sidebar.caption(f"介面版本：{APP_RELEASE}")
 
     if page == WORKBENCH_PAGE:
         _incident_workbench()

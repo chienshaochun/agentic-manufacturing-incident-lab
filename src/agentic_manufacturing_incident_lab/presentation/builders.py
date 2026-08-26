@@ -24,43 +24,43 @@ def _case_metrics(result: BenchmarkCaseResult) -> tuple[MetricCard, ...]:
     metrics = result.metrics
     return (
         MetricCard(
-            label="Workflow",
+            label="工作流 Workflow",
             value=result.run.status.value,
-            help_text="Terminal status of the coordinated multi-agent workflow.",
+            help_text="多 Agent 協作流程的最終狀態。",
         ),
         MetricCard(
-            label="Diagnostic",
+            label="診斷狀態 Diagnostic",
             value=(
                 result.run.diagnostic.run.final_state.status.value
                 if result.run.diagnostic is not None
                 else "none"
             ),
-            help_text="Terminal status returned by the Diagnostic specialist.",
+            help_text="Diagnostic Agent 回傳的最終狀態。",
         ),
         MetricCard(
-            label="Physical calls",
+            label="實際呼叫 Physical calls",
             value=str(metrics.tool_call_count),
-            help_text="Actual tool attempts, including retries.",
+            help_text="工具實際執行次數，包含重試。",
         ),
         MetricCard(
-            label="Handoffs",
+            label="交接次數 Handoffs",
             value=str(metrics.handoff_count),
-            help_text="Structured messages crossing agent responsibility boundaries.",
+            help_text="跨越 Agent 責任邊界的結構化訊息數量。",
         ),
         MetricCard(
-            label="Precision",
+            label="證據精確率 Precision",
             value=f"{metrics.evidence_precision:.3f}",
-            help_text="Expected claims divided by all claims that were produced.",
+            help_text="產生的主張中，符合預期答案的比例。",
         ),
         MetricCard(
-            label="Recall",
+            label="證據召回率 Recall",
             value=f"{metrics.evidence_recall:.3f}",
-            help_text="Expected claims that were found by the diagnostic path.",
+            help_text="預期主張中，被診斷流程成功找出的比例。",
         ),
         MetricCard(
-            label="Benchmark",
+            label="基準結果 Benchmark",
             value="PASS" if result.passed else "FAIL",
-            help_text="All correctness, safety, and resource gates combined.",
+            help_text="正確性、安全性與資源限制的綜合驗收結果。",
         ),
     )
 
@@ -208,28 +208,28 @@ def build_benchmark_presentation(
 ) -> BenchmarkPresentation:
     """Build dashboard cards and rows from aggregate benchmark output."""
     metrics = (
-        MetricCard("Cases", str(summary.case_count), "Total controlled cases."),
-        MetricCard("Passed", str(summary.passed_count), "Cases passing every gate."),
-        MetricCard("Pass rate", f"{summary.pass_rate:.3f}", "Passed cases / cases."),
+        MetricCard("案例數 Cases", str(summary.case_count), "受控案例總數。"),
+        MetricCard("通過 Passed", str(summary.passed_count), "通過所有閘門的案例數。"),
+        MetricCard("通過率 Pass rate", f"{summary.pass_rate:.3f}", "通過案例數／總案例數。"),
         MetricCard(
-            "Mean precision",
+            "平均精確率 Mean precision",
             f"{summary.mean_evidence_precision:.3f}",
-            "Macro-average evidence precision.",
+            "所有案例的 Evidence precision 巨觀平均。",
         ),
         MetricCard(
-            "Mean recall",
+            "平均召回率 Mean recall",
             f"{summary.mean_evidence_recall:.3f}",
-            "Macro-average evidence recall.",
+            "所有案例的 Evidence recall 巨觀平均。",
         ),
         MetricCard(
-            "Physical calls",
+            "實際呼叫 Physical calls",
             str(summary.total_tool_calls),
-            "All physical tool attempts across cases.",
+            "所有案例的工具實際執行次數。",
         ),
         MetricCard(
-            "Handoffs",
+            "交接次數 Handoffs",
             str(summary.total_handoffs),
-            "All structured agent messages across cases.",
+            "所有案例的結構化 Agent 交接數量。",
         ),
     )
     rows = tuple(

@@ -28,7 +28,7 @@
 - 安全政策像權限與聯鎖，避免未經批准的高風險操作。
 - 執行軌跡與報告像交班紀錄，讓後續人員能重現判斷過程。
 
-## 預計完成的能力
+## 目前完成的能力
 
 - 可重播的合成製造異常情境
 - 具工具選擇與重新規劃能力的單 Agent
@@ -38,11 +38,11 @@
 - 故障注入、評估指標與完整追蹤紀錄
 - Streamlit 操作介面與事件調查報告
 
-詳細邊界與驗收條件見 [產品契約](docs/PRODUCT_CONTRACT.md)，逐步實作方式見 [學習路線圖](docs/LEARNING_ROADMAP.md)，Phase 1 的資料關係見 [領域模型](docs/DOMAIN_MODEL.md)，Phase 2 的執行架構見 [模擬環境與工具系統](docs/PHASE_2_SIMULATOR_AND_TOOLS.md)，Phase 3 的決策流程見 [單一 Agent 決策循環](docs/PHASE_3_SINGLE_AGENT_LOOP.md)，Phase 4 的恢復架構見 [工作記憶與 Checkpoint](docs/PHASE_4_MEMORY_AND_CHECKPOINTS.md)，Phase 5 的安全邊界見 [批准、安全與故障恢復](docs/PHASE_5_SAFETY_AND_RECOVERY.md)，Phase 6 的角色分工見 [多 Agent 協作與比較](docs/PHASE_6_MULTI_AGENT_COLLABORATION.md)，Phase 7 的量化驗證見 [評估、故障注入與可觀測性](docs/PHASE_7_EVALUATION_AND_OBSERVABILITY.md)。
+詳細邊界與驗收條件見 [產品契約](docs/PRODUCT_CONTRACT.md)，逐步實作方式見 [學習路線圖](docs/LEARNING_ROADMAP.md)，Phase 1 的資料關係見 [領域模型](docs/DOMAIN_MODEL.md)，Phase 2 的執行架構見 [模擬環境與工具系統](docs/PHASE_2_SIMULATOR_AND_TOOLS.md)，Phase 3 的決策流程見 [單一 Agent 決策循環](docs/PHASE_3_SINGLE_AGENT_LOOP.md)，Phase 4 的恢復架構見 [工作記憶與 Checkpoint](docs/PHASE_4_MEMORY_AND_CHECKPOINTS.md)，Phase 5 的安全邊界見 [批准、安全與故障恢復](docs/PHASE_5_SAFETY_AND_RECOVERY.md)，Phase 6 的角色分工見 [多 Agent 協作與比較](docs/PHASE_6_MULTI_AGENT_COLLABORATION.md)，Phase 7 的量化驗證見 [評估、故障注入與可觀測性](docs/PHASE_7_EVALUATION_AND_OBSERVABILITY.md)，Phase 8 的完整操作方式見 [Streamlit 事件調查操作台](docs/PHASE_8_STREAMLIT_WORKBENCH.md)。
 
 ## 目前進度
 
-Phase 7 已完成：11 個 controlled behavior 與 Specialist failure cases 現在能自動執行並依答案表計算 Evidence precision、recall、grounding、Safety 與 Report correctness、physical tool calls 和 coordination handoffs。終端 summary 可查看整批結果，detailed trace 可追查單案的完整 Agent 履歷。下一階段將製作 Streamlit 操作台與端到端面試展示。
+Phase 8 已完成：除了 Phase 7 的 11 個 controlled behavior 與 Specialist failure cases，現在也能在 Streamlit 操作台執行單案、查看完整 Agent 履歷、比較全體 Benchmark，並下載 Markdown、JSON、CSV 與文字產物。整個 app 維持 deterministic、合成資料、只讀診斷與無 LLM 的明確邊界。
 
 ## 本機手動演練
 
@@ -52,7 +52,7 @@ Phase 7 已完成：11 個 controlled behavior 與 Specialist failure cases 現�
 cd agentic-manufacturing-incident-lab
 conda create -n agentic-lab python=3.12 -y
 conda activate agentic-lab
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev,ui]"
 ```
 
 執行完整領域流程與測試：
@@ -68,6 +68,7 @@ python examples\checkpoint_resume_walkthrough.py
 python examples\safety_recovery_walkthrough.py --scenario all --approval approve
 python examples\multi_agent_walkthrough.py
 python examples\benchmark_walkthrough.py
+python -m streamlit run streamlit_app.py
 python -m pytest
 ```
 

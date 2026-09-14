@@ -6,6 +6,10 @@ from agentic_manufacturing_incident_lab.evaluation import (
     render_benchmark_summary,
     render_benchmark_trace,
 )
+from agentic_manufacturing_incident_lab.hypotheses import (
+    ConnectivityHypothesisPolicy,
+    ManufacturingSignalHypothesisPolicy,
+)
 from agentic_manufacturing_incident_lab.presentation.models import (
     ActionAttemptView,
     BenchmarkPresentation,
@@ -14,6 +18,7 @@ from agentic_manufacturing_incident_lab.presentation.models import (
     EvidenceView,
     FailureView,
     HandoffView,
+    HypothesisTimelineView,
     HypothesisView,
     MetricCard,
     ReportView,
@@ -205,6 +210,62 @@ def _hypotheses(result: BenchmarkCaseResult) -> tuple[HypothesisView, ...]:
     )
 
 
+def _hypothesis_timeline(
+    result: BenchmarkCaseResult,
+) -> tuple[HypothesisTimelineView, ...]:
+    if result.run.diagnostic is None:
+        return ()
+    diagnostic = result.run.diagnostic.run
+    policy = (
+        ManufacturingSignalHypothesisPolicy()
+        if result.expectation.scenario_id.startswith("manufacturing-signal-flatline-")
+        else ConnectivityHypothesisPolicy()
+    )
+    observations = diagnostic.observations
+    rows: list[HypothesisTimelineView] = []
+    for step in range(len(observations) + 1):
+        current = observations[:step]
+        trigger = (
+            "初始：尚未取得 Observation"
+            if step == 0
+            else (
+                f"{observations[step - 1].observation_id}｜"
+                f"{localize_text(observations[step - 1].summary)}｜"
+                f"品質={observations[step - 1].quality_factor:.2f}"
+            )
+        )
+        evaluated_at = (
+            diagnostic.incident.reported_at
+            if step == 0
+            else observations[step - 1].observed_at
+        )
+        snapshots = policy.evaluate(
+            diagnostic.incident,
+            current,
+            evaluated_at=evaluated_at,
+        )
+        for hypothesis in snapshots:
+            rows.append(
+                HypothesisTimelineView(
+                    step=step,
+                    trigger_observation=trigger,
+                    candidate=hypothesis.hypothesis_id.rsplit("-", 1)[-1],
+                    hypothesis_id=hypothesis.hypothesis_id,
+                    statement=localize_text(hypothesis.statement),
+                    status=hypothesis.status.value,
+                    confidence=hypothesis.confidence,
+                    supporting_observation_ids=", ".join(
+                        hypothesis.supporting_observation_ids
+                    ),
+                    contradicting_observation_ids=", ".join(
+                        hypothesis.contradicting_observation_ids
+                    ),
+                    rationale=hypothesis.rationale,
+                )
+            )
+    return tuple(rows)
+
+
 def _safety(result: BenchmarkCaseResult) -> SafetyView | None:
     if result.run.safety_review is None:
         return None
@@ -262,6 +323,7 @@ def build_case_presentation(result: BenchmarkCaseResult) -> CasePresentation:
         handoffs=_handoffs(result),
         action_attempts=_action_attempts(result),
         hypotheses=_hypotheses(result),
+        hypothesis_timeline=_hypothesis_timeline(result),
         evidence=_evidence(result),
         safety=_safety(result),
         report=_report(result),

@@ -70,6 +70,14 @@ BENCHMARK_PAGE = "基準測試 Benchmark Dashboard"
 ABOUT_PAGE = "關於專案 About"
 APP_RELEASE = "Evidence Quality & Uncertainty v1"
 
+HYPOTHESIS_STATUS_LABELS = {
+    "open": "⚪ open",
+    "inconclusive": "🟡 inconclusive",
+    "supported": "🟢 supported",
+    "rejected": "⚫ rejected",
+    "conflicted": "🔴 conflicted",
+}
+
 
 def _metric_grid(metrics) -> None:
     columns = st.columns(4)
@@ -123,6 +131,20 @@ def _render_case_status(view: CasePresentation) -> None:
         st.error("本次執行未符合受控 Benchmark 的預期結果。")
 
 
+def _hypothesis_evolution_rows(view: CasePresentation) -> list[dict[str, object]]:
+    rows_by_step: dict[int, dict[str, object]] = {}
+    for snapshot in view.hypothesis_timeline:
+        row = rows_by_step.setdefault(
+            snapshot.step,
+            {
+                "步驟": snapshot.step,
+                "新 Observation": snapshot.trigger_observation,
+            },
+        )
+        row[snapshot.candidate] = HYPOTHESIS_STATUS_LABELS[snapshot.status]
+    return list(rows_by_step.values())
+
+
 def _render_case_details(view: CasePresentation) -> None:
     st.subheader("調查總覽 Investigation overview")
     _metric_grid(view.metrics)
@@ -162,6 +184,18 @@ def _render_case_details(view: CasePresentation) -> None:
             "Hypothesis 不是正式 Evidence，也不等同已確認 Root Cause。"
         )
         if view.hypotheses:
+            st.markdown("##### 假設演化時間線")
+            st.caption(
+                "由上往下閱讀：每取得一筆新 Observation，就重新評估全部候選原因。"
+                "紅色 conflicted 表示支持與反對訊號同時很強，不能硬選答案。"
+            )
+            st.dataframe(
+                _hypothesis_evolution_rows(view),
+                hide_index=True,
+                width="stretch",
+            )
+
+            st.markdown("##### 最終假設狀態")
             st.dataframe(
                 [asdict(hypothesis) for hypothesis in view.hypotheses],
                 hide_index=True,
@@ -176,6 +210,24 @@ def _render_case_details(view: CasePresentation) -> None:
                     "rationale": "評分摘要",
                 },
             )
+            with st.expander("查看每一步的支持／反對 Observation"):
+                st.dataframe(
+                    [asdict(snapshot) for snapshot in view.hypothesis_timeline],
+                    hide_index=True,
+                    width="stretch",
+                    column_config={
+                        "step": "步驟",
+                        "trigger_observation": "新 Observation",
+                        "candidate": "候選代碼",
+                        "hypothesis_id": "Hypothesis ID",
+                        "statement": "候選原因",
+                        "status": "狀態",
+                        "confidence": "信心值",
+                        "supporting_observation_ids": "支持的 Observations",
+                        "contradicting_observation_ids": "反對的 Observations",
+                        "rationale": "品質加權評分",
+                    },
+                )
         else:
             st.info("Diagnostic Agent 沒有產生可顯示的診斷假設。")
 

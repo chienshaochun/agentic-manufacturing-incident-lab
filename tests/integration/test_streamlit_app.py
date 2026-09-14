@@ -63,7 +63,9 @@ def test_run_button_executes_default_case_and_displays_metrics() -> None:
     assert any(metric.value == "PASS" for metric in app.metric)
     assert any("調查完成" in success.value for success in app.success)
     assert len(app.get("tab")) == 6
-    assert len(app.dataframe) == 4
+    assert len(app.dataframe) == 6
+    assert any("每取得一筆新 Observation" in caption.value for caption in app.caption)
+    assert len(app.dataframe[1].value) == 4
     assert any(
         "Hypothesis 不是正式 Evidence" in caption.value
         for caption in app.caption

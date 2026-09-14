@@ -33,6 +33,17 @@ def test_completed_case_presentation_contains_all_ui_sections() -> None:
     assert len(view.hypotheses) == 3
     assert view.hypotheses[0].status == "supported"
     assert "單一工作站 ST-02" in view.hypotheses[0].statement
+    assert len(view.hypothesis_timeline) == 12
+    assert {row.status for row in view.hypothesis_timeline if row.step == 0} == {"open"}
+    assert {
+        row.candidate: row.status
+        for row in view.hypothesis_timeline
+        if row.step == 3
+    } == {
+        "STATION": "supported",
+        "SHARED": "rejected",
+        "TELEMETRY": "inconclusive",
+    }
     assert len(view.evidence) == 1
     assert view.safety is not None
     assert view.safety.outcome == "approved"
@@ -53,6 +64,24 @@ def test_action_attempt_view_separates_action_and_physical_attempt() -> None:
     assert "network_reachable" in first.observations
 
 
+def test_hypothesis_timeline_preserves_observation_quality_and_links() -> None:
+    view = build_case_presentation(
+        case_result("low-quality-configuration-evidence-seed-120")
+    )
+    final_configuration = next(
+        row
+        for row in view.hypothesis_timeline
+        if row.step == 6 and row.candidate == "CONFIG"
+    )
+
+    assert len(view.hypothesis_timeline) == 35
+    assert "品質=0.40" in view.hypothesis_timeline[20].trigger_observation
+    assert final_configuration.status == "inconclusive"
+    assert "OBS-001" in final_configuration.supporting_observation_ids
+    assert "OBS-004" in final_configuration.supporting_observation_ids
+    assert "support_score=0.58" in final_configuration.rationale
+
+
 def test_diagnostic_failure_presentation_has_failure_but_no_products() -> None:
     view = build_case_presentation(case_result("diagnostic-exception-seed-43"))
 
@@ -61,6 +90,7 @@ def test_diagnostic_failure_presentation_has_failure_but_no_products() -> None:
     assert len(view.handoffs) == 1
     assert view.action_attempts == ()
     assert view.hypotheses == ()
+    assert view.hypothesis_timeline == ()
     assert view.evidence == ()
     assert view.safety is None
     assert view.report is None

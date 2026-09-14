@@ -39,7 +39,7 @@ CASE_LABELS = {
 WORKBENCH_PAGE = "事件調查台 Incident Workbench"
 BENCHMARK_PAGE = "基準測試 Benchmark Dashboard"
 ABOUT_PAGE = "關於專案 About"
-APP_RELEASE = "Hypothesis Engine v1"
+APP_RELEASE = "Dynamic Hypothesis Planner v1"
 
 
 def _metric_grid(metrics) -> None:
@@ -152,6 +152,10 @@ def _render_case_details(view: CasePresentation) -> None:
     with action_tab:
         st.markdown("#### 診斷動作與實際嘗試")
         st.caption("一個邏輯 Action 在重試時，可能包含多個實際 Attempt。")
+        st.caption(
+            "Hypothesis-driven Planner會在Action理由中記錄Utility、"
+            "未解假設涵蓋率、風險與成本。"
+        )
         if view.action_attempts:
             st.dataframe(
                 [asdict(attempt) for attempt in view.action_attempts],
@@ -388,7 +392,7 @@ def _about() -> None:
 合成情境、受限制工具、結構化 Handoff、獨立安全審查、Evidence-bound report
 與受控 Benchmark，讓每個決策都能被重播與稽核。
 
-目前 Planner 採用 deterministic rule-based policy。專案**沒有使用 LLM、外部 API、
+目前 Planner 採用 deterministic hypothesis-driven utility policy，並保留rule-based baseline。專案**沒有使用 LLM、外部 API、
 真實生產設備或機密工廠資料**，因此畫面結果不代表真實產線準確率。
 """
     )

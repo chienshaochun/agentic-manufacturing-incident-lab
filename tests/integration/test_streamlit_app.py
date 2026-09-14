@@ -45,7 +45,7 @@ def test_app_loads_incident_workbench_without_running_case() -> None:
     assert app.selectbox[0].value == "isolated-station-seed-43"
     assert app.button[0].label == "執行調查 Run investigation"
     assert any("請選擇案例" in info.value for info in app.info)
-    assert any("介面版本：Hypothesis Engine v1" in caption.value for caption in app.caption)
+    assert any("介面版本：Dynamic Hypothesis Planner v1" in caption.value for caption in app.caption)
 
 
 def test_run_button_executes_default_case_and_displays_metrics() -> None:
@@ -65,6 +65,7 @@ def test_run_button_executes_default_case_and_displays_metrics() -> None:
         "Hypothesis 不是正式 Evidence" in caption.value
         for caption in app.caption
     )
+    assert any("記錄Utility" in caption.value for caption in app.caption)
     assert any(
         "Benchmark 稽核軌跡： isolated-station-seed-43" in code.value
         for code in app.code
@@ -141,3 +142,4 @@ def test_about_page_explains_deterministic_no_llm_boundary() -> None:
     assert not app.exception
     assert app.title[0].value == "關於本實驗室"
     assert "沒有使用 LLM" in app.markdown[0].value
+    assert "hypothesis-driven utility policy" in app.markdown[0].value

@@ -32,6 +32,9 @@ CASE_LABELS = {
     "action-budget-safe-stop-seed-43": "動作額度耗盡｜Action budget safe stop",
     "sensor-staleness-seed-117": "製程訊號平線：感測器資料過期｜Sensor staleness",
     "configuration-drift-seed-118": "製程訊號平線：設定版本漂移｜Configuration drift",
+    "conflicting-sensor-evidence-seed-119": "製程訊號平線：感測資料矛盾｜Conflicting evidence",
+    "low-quality-configuration-evidence-seed-120": "製程訊號平線：設定資料品質不足｜Low-quality evidence",
+    "multiple-supported-causes-seed-121": "製程訊號平線：同時支持多個原因｜Multiple causes",
     "diagnostic-exception-seed-43": "診斷 Agent 例外｜Diagnostic exception",
     "diagnostic-invalid-response-seed-43": "診斷回覆無效｜Invalid response",
     "safety-reviewer-exception-seed-43": "安全審查 Agent 例外｜Reviewer exception",
@@ -39,10 +42,41 @@ CASE_LABELS = {
     "contradictory-approval-seed-43": "安全核准矛盾｜Contradictory approval",
 }
 
+SYMPTOM_CASES = {
+    "設備無法連線或遙測中斷": (
+        "isolated-station-seed-43",
+        "shared-infrastructure-seed-73",
+        "telemetry-path-seed-91",
+        "isolated-station-seed-42",
+        "isolated-station-seed-44",
+    ),
+    "製程數值持續平線": (
+        "sensor-staleness-seed-117",
+        "configuration-drift-seed-118",
+        "conflicting-sensor-evidence-seed-119",
+        "low-quality-configuration-evidence-seed-120",
+        "multiple-supported-causes-seed-121",
+    ),
+}
+
+SIMULATION_BATCH_LABELS = {
+    case_id: f"模擬批次 {chr(65 + index)}｜固定資料，可重播"
+    for case_ids in SYMPTOM_CASES.values()
+    for index, case_id in enumerate(case_ids)
+}
+
 WORKBENCH_PAGE = "事件調查台 Incident Workbench"
 BENCHMARK_PAGE = "基準測試 Benchmark Dashboard"
 ABOUT_PAGE = "關於專案 About"
-APP_RELEASE = "Agent Evaluation & Planner A/B v1"
+APP_RELEASE = "Investigation Reasoning UX v1"
+
+HYPOTHESIS_STATUS_LABELS = {
+    "open": "⚪ open",
+    "inconclusive": "🟡 inconclusive",
+    "supported": "🟢 supported",
+    "rejected": "⚫ rejected",
+    "conflicted": "🔴 conflicted",
+}
 
 
 def _metric_grid(metrics) -> None:
@@ -97,6 +131,20 @@ def _render_case_status(view: CasePresentation) -> None:
         st.error("本次執行未符合受控 Benchmark 的預期結果。")
 
 
+def _hypothesis_evolution_rows(view: CasePresentation) -> list[dict[str, object]]:
+    rows_by_step: dict[int, dict[str, object]] = {}
+    for snapshot in view.hypothesis_timeline:
+        row = rows_by_step.setdefault(
+            snapshot.step,
+            {
+                "步驟": snapshot.step,
+                "新 Observation": snapshot.trigger_observation,
+            },
+        )
+        row[snapshot.candidate] = HYPOTHESIS_STATUS_LABELS[snapshot.status]
+    return list(rows_by_step.values())
+
+
 def _render_case_details(view: CasePresentation) -> None:
     st.subheader("調查總覽 Investigation overview")
     _metric_grid(view.metrics)
@@ -136,6 +184,18 @@ def _render_case_details(view: CasePresentation) -> None:
             "Hypothesis 不是正式 Evidence，也不等同已確認 Root Cause。"
         )
         if view.hypotheses:
+            st.markdown("##### 假設演化時間線")
+            st.caption(
+                "由上往下閱讀：每取得一筆新 Observation，就重新評估全部候選原因。"
+                "紅色 conflicted 表示支持與反對訊號同時很強，不能硬選答案。"
+            )
+            st.dataframe(
+                _hypothesis_evolution_rows(view),
+                hide_index=True,
+                width="stretch",
+            )
+
+            st.markdown("##### 最終假設狀態")
             st.dataframe(
                 [asdict(hypothesis) for hypothesis in view.hypotheses],
                 hide_index=True,
@@ -150,10 +210,55 @@ def _render_case_details(view: CasePresentation) -> None:
                     "rationale": "評分摘要",
                 },
             )
+            with st.expander("查看每一步的支持／反對 Observation"):
+                st.dataframe(
+                    [asdict(snapshot) for snapshot in view.hypothesis_timeline],
+                    hide_index=True,
+                    width="stretch",
+                    column_config={
+                        "step": "步驟",
+                        "trigger_observation": "新 Observation",
+                        "candidate": "候選代碼",
+                        "hypothesis_id": "Hypothesis ID",
+                        "statement": "候選原因",
+                        "status": "狀態",
+                        "confidence": "信心值",
+                        "supporting_observation_ids": "支持的 Observations",
+                        "contradicting_observation_ids": "反對的 Observations",
+                        "rationale": "品質加權評分",
+                    },
+                )
         else:
             st.info("Diagnostic Agent 沒有產生可顯示的診斷假設。")
 
     with action_tab:
+        st.markdown("#### Planner 候選決策")
+        st.caption(
+            "每一步都先替所有候選 Tool 計算 Utility = Information × 未解假設涵蓋率 "
+            "− 執行成本 − 風險成本 − 重複成本；selected 才是實際執行者。"
+        )
+        if view.planner_candidates:
+            st.dataframe(
+                [asdict(candidate) for candidate in view.planner_candidates],
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "step": "決策步驟",
+                    "tool": "候選 Tool",
+                    "parameters": "參數",
+                    "information_value": "資訊價值",
+                    "unresolved_coverage": "未解假設涵蓋率",
+                    "execution_cost": "執行成本",
+                    "risk_cost": "風險成本",
+                    "repeat_cost": "重複成本",
+                    "utility": "Utility",
+                    "eligible": "符合資格",
+                    "selected": "實際選擇",
+                },
+            )
+        else:
+            st.info("本次執行沒有可重建的 Planner 候選評分。")
+
         st.markdown("#### 診斷動作與實際嘗試")
         st.caption("一個邏輯 Action 在重試時，可能包含多個實際 Attempt。")
         st.caption(
@@ -273,18 +378,26 @@ def _render_case_details(view: CasePresentation) -> None:
 def _incident_workbench() -> None:
     st.title("製造事件調查台")
     st.caption(
-        "將一個受控 Incident 依序交給 Coordinator、Diagnostic Agent、"
-        "Safety Reviewer 與 Reporter Agent 調查。"
+        "操作員只輸入可觀察的症狀；隱藏原因由模擬環境保存，"
+        "不會預先交給 Diagnostic Agent。"
     )
     cases = _case_lookup()
-    case_ids = tuple(cases)
-    default_index = case_ids.index("isolated-station-seed-43")
+    selected_symptom = st.selectbox(
+        "回報症狀 Observed symptom",
+        options=tuple(SYMPTOM_CASES),
+        help="這是現場人員實際看得到的異常範圍，不是 Root Cause。",
+    )
+    case_ids = SYMPTOM_CASES[selected_symptom]
     selected_id = st.selectbox(
-        "選擇受控案例 Benchmark case",
+        "選擇可重播模擬批次 Simulation batch",
         options=case_ids,
-        index=default_index,
-        format_func=lambda case_id: CASE_LABELS[case_id],
-        help="每個案例都將可重播情境綁定到明確的安全預期結果。",
+        format_func=lambda case_id: SIMULATION_BATCH_LABELS[case_id],
+        help="批次只用來固定模擬世界；標籤不會透露隱藏故障原因。",
+    )
+    operator_note = st.text_area(
+        "操作員補充現象 Operator note（選填）",
+        placeholder="例如：同區另一台設備正常、問題在換班後開始出現……",
+        help="目前版本保留這段文字供展示，尚未使用 NLP 解析自由文字。",
     )
     selected = cases[selected_id]
     incident = selected.scenario.incident
@@ -294,11 +407,18 @@ def _incident_workbench() -> None:
         f"**嚴重度 Severity：** `{incident.severity.value}`"
     )
     st.markdown(f"**調查目標 Goal：** {incident.goal}")
+    if operator_note.strip():
+        st.markdown(f"**操作員補充：** {operator_note.strip()}")
     st.caption(
-        f"情境 Scenario：{selected.scenario.scenario_id} · seed={selected.scenario.seed} "
-        f"· Action 上限={selected.action_limit} · 故障注入="
-        f"{selected.specialist_fault.value}"
+        f"模擬批次 seed={selected.scenario.seed} · Action 上限={selected.action_limit}。"
+        "Root Cause 與 Benchmark answer key 在調查期間對 Agent 隱藏。"
     )
+    with st.expander("為什麼還需要模擬批次？"):
+        st.write(
+            "本專案沒有連接真實機台，因此批次負責提供可重播的隱藏環境。"
+            "Diagnostic Agent 只能透過 Tool 讀取 Observation；調查結束後，"
+            "Evaluator 才使用 answer key 驗證結果。"
+        )
 
     if st.button(
         "執行調查 Run investigation",
@@ -310,7 +430,7 @@ def _incident_workbench() -> None:
 
     result = _current_case_result(selected_id)
     if result is None:
-        st.info("請選擇案例並執行調查，畫面才會顯示該次結果。")
+        st.info("請選擇症狀與模擬批次並執行調查，畫面才會顯示該次結果。")
         return
     _render_case_details(build_case_presentation(result))
 
@@ -330,7 +450,7 @@ def _benchmark_dashboard() -> None:
 
     view = _current_benchmark_view()
     if view is None:
-        st.info("執行 Benchmark 後，即可比較全部 13 個受控案例。")
+        st.info("執行 Benchmark 後，即可比較全部 16 個受控案例。")
         return
 
     _metric_grid(view.metrics)

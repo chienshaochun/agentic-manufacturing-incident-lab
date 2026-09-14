@@ -42,10 +42,13 @@ def test_app_loads_incident_workbench_without_running_case() -> None:
     app = load_app()
 
     assert app.title[0].value == "製造事件調查台"
-    assert app.selectbox[0].value == "isolated-station-seed-43"
+    assert app.selectbox[0].value == "設備無法連線或遙測中斷"
+    assert app.selectbox[1].value == "isolated-station-seed-43"
+    assert app.selectbox[1].label == "選擇可重播模擬批次 Simulation batch"
     assert app.button[0].label == "執行調查 Run investigation"
-    assert any("請選擇案例" in info.value for info in app.info)
-    assert any("介面版本：Agent Evaluation & Planner A/B v1" in caption.value for caption in app.caption)
+    assert any("請選擇症狀與模擬批次" in info.value for info in app.info)
+    assert any("answer key 在調查期間對 Agent 隱藏" in caption.value for caption in app.caption)
+    assert any("介面版本：Investigation Reasoning UX v1" in caption.value for caption in app.caption)
 
 
 def test_run_button_executes_default_case_and_displays_metrics() -> None:
@@ -60,7 +63,11 @@ def test_run_button_executes_default_case_and_displays_metrics() -> None:
     assert any(metric.value == "PASS" for metric in app.metric)
     assert any("調查完成" in success.value for success in app.success)
     assert len(app.get("tab")) == 6
-    assert len(app.dataframe) == 4
+    assert len(app.dataframe) == 7
+    assert any("每取得一筆新 Observation" in caption.value for caption in app.caption)
+    assert len(app.dataframe[1].value) == 4
+    assert any("Utility = Information" in caption.value for caption in app.caption)
+    assert any("Planner 候選決策" in code.value for code in app.code)
     assert any(
         "Hypothesis 不是正式 Evidence" in caption.value
         for caption in app.caption
@@ -103,17 +110,18 @@ def test_case_download_buttons_serve_chinese_markdown_and_trace() -> None:
     )
 
 
-def test_reporter_failure_shows_preserved_review_and_failure_panel() -> None:
+def test_uncertain_symptom_batch_safe_stops_without_report() -> None:
     app = load_app()
 
-    app.selectbox[0].set_value("reporter-exception-seed-43").run()
+    app.selectbox[0].set_value("製程數值持續平線").run()
+    app.selectbox[1].set_value("low-quality-configuration-evidence-seed-120").run()
     app.button[0].click().run()
 
     assert not app.exception
-    assert any("安全收斂" in warning.value for warning in app.warning)
-    assert any("Safety outcome：approved" in success.value for success in app.success)
+    assert any("安全停止" in info.value for info in app.info)
+    assert any("Safety outcome：requires_attention" in warning.value for warning in app.warning)
     assert any("沒有產生正式報告" in info.value for info in app.info)
-    assert any("階段： reporting" in code.value for code in app.code)
+    assert any("設定資料品質不足" not in caption.value for caption in app.caption)
 
 
 def test_benchmark_dashboard_runs_all_controlled_cases() -> None:
@@ -126,13 +134,13 @@ def test_benchmark_dashboard_runs_all_controlled_cases() -> None:
     app.button[0].click().run(timeout=60)
 
     assert not app.exception
-    assert any(metric.label == "案例數 Cases" and metric.value == "13" for metric in app.metric)
-    assert any(metric.label == "通過 Passed" and metric.value == "13" for metric in app.metric)
+    assert any(metric.label == "案例數 Cases" and metric.value == "16" for metric in app.metric)
+    assert any(metric.label == "通過 Passed" and metric.value == "16" for metric in app.metric)
     assert len(app.dataframe) == 2
-    assert len(app.dataframe[0].value) == 13
+    assert len(app.dataframe[0].value) == 16
     assert len(app.dataframe[1].value) == 5
     assert any("所有案例" in success.value for success in app.success)
-    assert any("- 案例數： 13" in code.value for code in app.code)
+    assert any("- 案例數： 16" in code.value for code in app.code)
 
 
 def test_about_page_explains_guarded_optional_llm_boundary() -> None:

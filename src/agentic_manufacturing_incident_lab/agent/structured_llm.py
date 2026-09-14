@@ -99,6 +99,10 @@ class StructuredLLMPlanner:
                     "kind": item.kind.value,
                     "summary": item.summary,
                     "values": dict(item.values),
+                    "source_reliability": item.source_reliability,
+                    "measurement_quality": item.measurement_quality,
+                    "freshness": item.freshness,
+                    "quality_factor": item.quality_factor,
                 }
                 for item in context.observations
             ),

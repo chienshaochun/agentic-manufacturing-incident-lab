@@ -50,6 +50,31 @@ class AssetTruth:
 
 
 @dataclass(frozen=True, slots=True)
+class SourceQualityProfile:
+    """Synthetic trust characteristics applied to one observation source."""
+
+    source: str
+    source_reliability: float = 1.0
+    measurement_quality: float = 1.0
+    freshness: float = 1.0
+
+    def __post_init__(self) -> None:
+        require_text(self.source, "source")
+        for field_name in (
+            "source_reliability",
+            "measurement_quality",
+            "freshness",
+        ):
+            value = getattr(self, field_name)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not 0.0 <= value <= 1.0
+            ):
+                raise ValueError(f"{field_name} must be between 0.0 and 1.0")
+
+
+@dataclass(frozen=True, slots=True)
 class ScenarioBrief:
     """The limited scenario context that may be given to an agent."""
 
@@ -80,6 +105,7 @@ class ScenarioDefinition:
     assets: tuple[AssetTruth, ...]
     faulted_asset_id: str
     root_cause_code: str
+    source_quality_profiles: tuple[SourceQualityProfile, ...] = ()
 
     def __post_init__(self) -> None:
         for field_name in ("scenario_id", "title", "faulted_asset_id", "root_cause_code"):
@@ -97,7 +123,12 @@ class ScenarioDefinition:
             raise ValueError("incident asset_id must exist in assets")
         if self.faulted_asset_id not in asset_ids:
             raise ValueError("faulted_asset_id must exist in assets")
+        profiles = tuple(self.source_quality_profiles)
+        sources = tuple(item.source for item in profiles)
+        if len(set(sources)) != len(sources):
+            raise ValueError("source_quality_profiles must have unique sources")
         object.__setattr__(self, "assets", assets)
+        object.__setattr__(self, "source_quality_profiles", profiles)
 
     def to_brief(self) -> ScenarioBrief:
         """Return an agent-visible view with no root cause or asset truth fields."""
@@ -114,3 +145,11 @@ class ScenarioDefinition:
             if asset.asset_id == asset_id:
                 return asset
         raise KeyError(f"unknown asset_id: {asset_id}")
+
+    def quality_for_source(self, source: str) -> SourceQualityProfile:
+        """Return an explicit profile or the fully trusted simulator default."""
+        require_text(source, "source")
+        for profile in self.source_quality_profiles:
+            if profile.source == source:
+                return profile
+        return SourceQualityProfile(source=source)

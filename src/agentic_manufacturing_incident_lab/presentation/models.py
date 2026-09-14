@@ -54,6 +54,35 @@ class HypothesisView:
 
 
 @dataclass(frozen=True, slots=True)
+class HypothesisTimelineView:
+    step: int
+    trigger_observation: str
+    candidate: str
+    hypothesis_id: str
+    statement: str
+    status: str
+    confidence: float
+    supporting_observation_ids: str
+    contradicting_observation_ids: str
+    rationale: str
+
+
+@dataclass(frozen=True, slots=True)
+class PlannerCandidateView:
+    step: int
+    tool: str
+    parameters: str
+    information_value: float
+    unresolved_coverage: float
+    execution_cost: float
+    risk_cost: float
+    repeat_cost: float
+    utility: float
+    eligible: bool
+    selected: bool
+
+
+@dataclass(frozen=True, slots=True)
 class SafetyView:
     outcome: str
     rationale: str
@@ -92,6 +121,8 @@ class CasePresentation:
     handoffs: tuple[HandoffView, ...]
     action_attempts: tuple[ActionAttemptView, ...]
     hypotheses: tuple[HypothesisView, ...]
+    hypothesis_timeline: tuple[HypothesisTimelineView, ...]
+    planner_candidates: tuple[PlannerCandidateView, ...]
     evidence: tuple[EvidenceView, ...]
     safety: SafetyView | None
     report: ReportView | None

@@ -3,6 +3,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from agentic_manufacturing_incident_lab.domain import (
+    HypothesisEffect,
+    HypothesisSignal,
     HypothesisStatus,
     Incident,
     IncidentSeverity,
@@ -101,11 +103,6 @@ def test_peer_failure_supports_shared_infrastructure_hypothesis() -> None:
 
 
 def test_conflicting_signal_for_same_observation_is_rejected() -> None:
-    from agentic_manufacturing_incident_lab.domain import (
-        HypothesisEffect,
-        HypothesisSignal,
-    )
-
     definitions = (HypothesisDefinition("HYP-001", "Candidate cause."),)
     signals = (
         HypothesisSignal("HYP-001", "OBS-001", HypothesisEffect.SUPPORTS, 0.5, "A"),
@@ -118,4 +115,135 @@ def test_conflicting_signal_for_same_observation_is_rejected() -> None:
             definitions=definitions,
             signals=signals,
             evaluated_at=NOW,
+        )
+
+
+def test_low_quality_contradiction_does_not_prematurely_reject() -> None:
+    hypotheses = evaluate_hypotheses(
+        incident=_incident(),
+        definitions=(HypothesisDefinition("HYP-001", "Candidate cause."),),
+        signals=(
+            HypothesisSignal(
+                "HYP-001",
+                "OBS-LOW-QUALITY",
+                HypothesisEffect.CONTRADICTS,
+                1.0,
+                "A weak measurement contradicts the cause.",
+            ),
+        ),
+        observation_quality={"OBS-LOW-QUALITY": 0.5},
+        evaluated_at=NOW,
+    )
+
+    assert hypotheses[0].status is HypothesisStatus.INCONCLUSIVE
+    assert "contradiction_score=0.50" in hypotheses[0].rationale
+
+
+def test_strong_support_and_contradiction_become_conflicted() -> None:
+    hypotheses = evaluate_hypotheses(
+        incident=_incident(),
+        definitions=(HypothesisDefinition("HYP-001", "Candidate cause."),),
+        signals=(
+            HypothesisSignal(
+                "HYP-001", "OBS-SUPPORT", HypothesisEffect.SUPPORTS, 0.9, "A"
+            ),
+            HypothesisSignal(
+                "HYP-001", "OBS-CONTRADICT", HypothesisEffect.CONTRADICTS, 0.9, "B"
+            ),
+        ),
+        evaluated_at=NOW,
+    )
+
+    assert hypotheses[0].status is HypothesisStatus.CONFLICTED
+    assert hypotheses[0].supporting_observation_ids == ("OBS-SUPPORT",)
+    assert hypotheses[0].contradicting_observation_ids == ("OBS-CONTRADICT",)
+
+
+def test_zero_quality_signal_leaves_hypothesis_open() -> None:
+    hypotheses = evaluate_hypotheses(
+        incident=_incident(),
+        definitions=(HypothesisDefinition("HYP-001", "Candidate cause."),),
+        signals=(
+            HypothesisSignal(
+                "HYP-001", "OBS-UNUSABLE", HypothesisEffect.SUPPORTS, 1.0, "A"
+            ),
+        ),
+        observation_quality={"OBS-UNUSABLE": 0.0},
+        evaluated_at=NOW,
+    )
+
+    assert hypotheses[0].status is HypothesisStatus.OPEN
+    assert hypotheses[0].observation_ids == ()
+
+
+def test_support_requires_independent_sources_declared_by_hypothesis() -> None:
+    definition = HypothesisDefinition(
+        "HYP-001",
+        "Sensor data is stale.",
+        min_supporting_sources=2,
+        required_support_sources=("alarm_historian", "sensor_monitor"),
+    )
+    signals = (
+        HypothesisSignal(
+            "HYP-001", "OBS-ALARM-1", HypothesisEffect.SUPPORTS, 0.5, "A"
+        ),
+        HypothesisSignal(
+            "HYP-001", "OBS-ALARM-2", HypothesisEffect.SUPPORTS, 0.5, "B"
+        ),
+    )
+    hypotheses = evaluate_hypotheses(
+        incident=_incident(),
+        definitions=(definition,),
+        signals=signals,
+        observation_sources={
+            "OBS-ALARM-1": "alarm_historian",
+            "OBS-ALARM-2": "alarm_historian",
+        },
+        evaluated_at=NOW,
+    )
+
+    assert hypotheses[0].status is HypothesisStatus.INCONCLUSIVE
+    assert "support_score=1.00" in hypotheses[0].rationale
+    assert "supporting_sources=1" in hypotheses[0].rationale
+    assert "source_requirement_met=false" in hypotheses[0].rationale
+
+
+def test_required_independent_sources_allow_supported_status() -> None:
+    definition = HypothesisDefinition(
+        "HYP-001",
+        "Sensor data is stale.",
+        min_supporting_sources=2,
+        required_support_sources=("alarm_historian", "sensor_monitor"),
+    )
+    signals = (
+        HypothesisSignal(
+            "HYP-001", "OBS-ALARM", HypothesisEffect.SUPPORTS, 0.3, "A"
+        ),
+        HypothesisSignal(
+            "HYP-001", "OBS-SENSOR", HypothesisEffect.SUPPORTS, 0.7, "B"
+        ),
+    )
+    hypotheses = evaluate_hypotheses(
+        incident=_incident(),
+        definitions=(definition,),
+        signals=signals,
+        observation_sources={
+            "OBS-ALARM": "alarm_historian",
+            "OBS-SENSOR": "sensor_monitor",
+        },
+        evaluated_at=NOW,
+    )
+
+    assert hypotheses[0].status is HypothesisStatus.SUPPORTED
+    assert "supporting_sources=2" in hypotheses[0].rationale
+    assert "source_requirement_met=true" in hypotheses[0].rationale
+
+
+@pytest.mark.parametrize("value", [0, -1, True, 1.5])
+def test_definition_requires_positive_supporting_source_count(value) -> None:
+    with pytest.raises(ValueError, match="min_supporting_sources"):
+        HypothesisDefinition(
+            "HYP-001",
+            "Candidate.",
+            min_supporting_sources=value,
         )

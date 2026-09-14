@@ -33,6 +33,17 @@ def test_completed_case_presentation_contains_all_ui_sections() -> None:
     assert len(view.hypotheses) == 3
     assert view.hypotheses[0].status == "supported"
     assert "單一工作站 ST-02" in view.hypotheses[0].statement
+    assert len(view.hypothesis_timeline) == 12
+    assert {row.status for row in view.hypothesis_timeline if row.step == 0} == {"open"}
+    assert {
+        row.candidate: row.status
+        for row in view.hypothesis_timeline
+        if row.step == 3
+    } == {
+        "STATION": "supported",
+        "SHARED": "rejected",
+        "TELEMETRY": "inconclusive",
+    }
     assert len(view.evidence) == 1
     assert view.safety is not None
     assert view.safety.outcome == "approved"
@@ -53,6 +64,40 @@ def test_action_attempt_view_separates_action_and_physical_attempt() -> None:
     assert "network_reachable" in first.observations
 
 
+def test_planner_candidates_show_alternatives_and_selected_maximum() -> None:
+    view = build_case_presentation(case_result("isolated-station-seed-43"))
+
+    assert len(view.planner_candidates) == 7
+    for step in (1, 2, 3):
+        candidates = tuple(row for row in view.planner_candidates if row.step == step)
+        selected = tuple(row for row in candidates if row.selected)
+        assert len(selected) == 1
+        assert selected[0].eligible is True
+        assert selected[0].utility == max(
+            row.utility for row in candidates if row.eligible
+        )
+    assert "Planner 候選決策" in view.trace_text
+    assert "selected=yes" in view.trace_text
+
+
+def test_hypothesis_timeline_preserves_observation_quality_and_links() -> None:
+    view = build_case_presentation(
+        case_result("low-quality-configuration-evidence-seed-120")
+    )
+    final_configuration = next(
+        row
+        for row in view.hypothesis_timeline
+        if row.step == 6 and row.candidate == "CONFIG"
+    )
+
+    assert len(view.hypothesis_timeline) == 35
+    assert "品質=0.40" in view.hypothesis_timeline[20].trigger_observation
+    assert final_configuration.status == "inconclusive"
+    assert "OBS-001" in final_configuration.supporting_observation_ids
+    assert "OBS-004" in final_configuration.supporting_observation_ids
+    assert "support_score=0.58" in final_configuration.rationale
+
+
 def test_diagnostic_failure_presentation_has_failure_but_no_products() -> None:
     view = build_case_presentation(case_result("diagnostic-exception-seed-43"))
 
@@ -61,6 +106,8 @@ def test_diagnostic_failure_presentation_has_failure_but_no_products() -> None:
     assert len(view.handoffs) == 1
     assert view.action_attempts == ()
     assert view.hypotheses == ()
+    assert view.hypothesis_timeline == ()
+    assert view.planner_candidates == ()
     assert view.evidence == ()
     assert view.safety is None
     assert view.report is None
@@ -83,20 +130,20 @@ def test_benchmark_presentation_contains_aggregate_cards_and_rows() -> None:
     view = build_benchmark_presentation(run_phase7_benchmark())
 
     assert tuple(card.value for card in view.metrics) == (
-        "13",
-        "13",
+        "16",
+        "16",
         "1.000",
         "1.000",
         "1.000",
-        "0.636",
+        "0.700",
         "0.000",
         "0.000",
         "3.857",
         "n/a",
-        "33",
-        "56",
+        "51",
+        "68",
     )
-    assert len(view.rows) == 13
+    assert len(view.rows) == 16
     assert all(row.passed for row in view.rows)
     assert view.rows[-1].failure == "conflicting_result"
     assert "- 是否全部通過： yes" in view.summary_text

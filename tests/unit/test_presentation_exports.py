@@ -33,6 +33,10 @@ def test_case_json_contains_grounded_nested_products() -> None:
     assert document["report"]["evidence_ids"]
     assert len(document["hypotheses"]) == 3
     assert document["hypotheses"][0]["status"] == "supported"
+    assert len(document["hypothesis_timeline"]) == 12
+    assert document["hypothesis_timeline"][0]["status"] == "open"
+    assert len(document["planner_candidates"]) == 7
+    assert sum(row["selected"] for row in document["planner_candidates"]) == 3
     assert len(document["handoffs"]) == 6
 
 
@@ -54,8 +58,8 @@ def test_benchmark_exports_have_all_cases_and_stable_columns() -> None:
     document = json.loads(benchmark_json(view))
     rows = list(csv.DictReader(StringIO(benchmark_csv(view))))
 
-    assert len(document["rows"]) == 13
-    assert len(rows) == 13
+    assert len(document["rows"]) == 16
+    assert len(rows) == 16
     assert tuple(rows[0]) == (
         "case",
         "workflow",

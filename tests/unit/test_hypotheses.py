@@ -46,6 +46,35 @@ def test_hypothesis_exposes_grounding_observations_in_stable_order() -> None:
     assert hypothesis.observation_ids == ("OBS-001", "OBS-002", "OBS-003")
 
 
+def test_conflicted_hypothesis_requires_both_signal_directions() -> None:
+    hypothesis = Hypothesis(
+        hypothesis_id="HYP-CONFLICT",
+        incident_id="INC-001",
+        statement="The sensor stream is stale.",
+        status=HypothesisStatus.CONFLICTED,
+        confidence=0.50,
+        supporting_observation_ids=("OBS-SUPPORT",),
+        contradicting_observation_ids=("OBS-CONTRADICT",),
+        rationale="Independent sources disagree.",
+        updated_at=NOW,
+    )
+
+    assert hypothesis.status is HypothesisStatus.CONFLICTED
+
+    with pytest.raises(ValueError, match="requires supporting and contradicting"):
+        Hypothesis(
+            hypothesis_id="HYP-CONFLICT",
+            incident_id="INC-001",
+            statement="The sensor stream is stale.",
+            status=HypothesisStatus.CONFLICTED,
+            confidence=0.50,
+            supporting_observation_ids=("OBS-SUPPORT",),
+            contradicting_observation_ids=(),
+            rationale="Missing contradiction.",
+            updated_at=NOW,
+        )
+
+
 def test_observation_cannot_both_support_and_contradict() -> None:
     with pytest.raises(ValueError, match="both support and contradict"):
         Hypothesis(

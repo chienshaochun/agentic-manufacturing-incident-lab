@@ -6,6 +6,15 @@ from agentic_manufacturing_incident_lab.evaluation import (
     render_benchmark_summary,
     render_benchmark_trace,
 )
+from agentic_manufacturing_incident_lab.agent import (
+    AgentContext,
+    HypothesisDrivenPlanner,
+    ManufacturingSignalPlanner,
+)
+from agentic_manufacturing_incident_lab.hypotheses import (
+    ConnectivityHypothesisPolicy,
+    ManufacturingSignalHypothesisPolicy,
+)
 from agentic_manufacturing_incident_lab.presentation.models import (
     ActionAttemptView,
     BenchmarkPresentation,
@@ -14,8 +23,10 @@ from agentic_manufacturing_incident_lab.presentation.models import (
     EvidenceView,
     FailureView,
     HandoffView,
+    HypothesisTimelineView,
     HypothesisView,
     MetricCard,
+    PlannerCandidateView,
     ReportView,
     SafetyView,
 )
@@ -205,6 +216,169 @@ def _hypotheses(result: BenchmarkCaseResult) -> tuple[HypothesisView, ...]:
     )
 
 
+def _hypothesis_timeline(
+    result: BenchmarkCaseResult,
+) -> tuple[HypothesisTimelineView, ...]:
+    if result.run.diagnostic is None:
+        return ()
+    diagnostic = result.run.diagnostic.run
+    policy = (
+        ManufacturingSignalHypothesisPolicy()
+        if result.expectation.scenario_id.startswith("manufacturing-signal-flatline-")
+        else ConnectivityHypothesisPolicy()
+    )
+    observations = diagnostic.observations
+    rows: list[HypothesisTimelineView] = []
+    for step in range(len(observations) + 1):
+        current = observations[:step]
+        trigger = (
+            "初始：尚未取得 Observation"
+            if step == 0
+            else (
+                f"{observations[step - 1].observation_id}｜"
+                f"{localize_text(observations[step - 1].summary)}｜"
+                f"品質={observations[step - 1].quality_factor:.2f}"
+            )
+        )
+        evaluated_at = (
+            diagnostic.incident.reported_at
+            if step == 0
+            else observations[step - 1].observed_at
+        )
+        snapshots = policy.evaluate(
+            diagnostic.incident,
+            current,
+            evaluated_at=evaluated_at,
+        )
+        for hypothesis in snapshots:
+            rows.append(
+                HypothesisTimelineView(
+                    step=step,
+                    trigger_observation=trigger,
+                    candidate=hypothesis.hypothesis_id.rsplit("-", 1)[-1],
+                    hypothesis_id=hypothesis.hypothesis_id,
+                    statement=localize_text(hypothesis.statement),
+                    status=hypothesis.status.value,
+                    confidence=hypothesis.confidence,
+                    supporting_observation_ids=", ".join(
+                        hypothesis.supporting_observation_ids
+                    ),
+                    contradicting_observation_ids=", ".join(
+                        hypothesis.contradicting_observation_ids
+                    ),
+                    rationale=hypothesis.rationale,
+                )
+            )
+    return tuple(rows)
+
+
+def _planner_candidates(
+    result: BenchmarkCaseResult,
+) -> tuple[PlannerCandidateView, ...]:
+    if (
+        result.run.diagnostic is None
+        or not result.planner_name
+        or not result.known_asset_ids
+        or not result.available_tools
+    ):
+        return ()
+    diagnostic = result.run.diagnostic.run
+    if len(diagnostic.memory_states) < len(diagnostic.executions) + 1:
+        return ()
+    hypothesis_policy = (
+        ManufacturingSignalHypothesisPolicy()
+        if result.planner_name == ManufacturingSignalPlanner.name
+        else ConnectivityHypothesisPolicy()
+    )
+    planner = (
+        ManufacturingSignalPlanner()
+        if result.planner_name == ManufacturingSignalPlanner.name
+        else HypothesisDrivenPlanner()
+    )
+    investigating_state = next(
+        state for state in diagnostic.task_states
+        if state.status.value == "investigating"
+    )
+    rows: list[PlannerCandidateView] = []
+    for index, execution in enumerate(diagnostic.executions):
+        prior_executions = diagnostic.executions[:index]
+        observations = tuple(
+            observation
+            for record in prior_executions
+            for observation in record.observations
+        )
+        evaluated_at = (
+            observations[-1].observed_at
+            if observations
+            else diagnostic.incident.reported_at
+        )
+        hypotheses = hypothesis_policy.evaluate(
+            diagnostic.incident,
+            observations,
+            evaluated_at=evaluated_at,
+        )
+        matching_memories = tuple(
+            memory for memory in diagnostic.memory_states
+            if memory.step_budget.actions_used == index
+        )
+        if not matching_memories:
+            continue
+        context = AgentContext(
+            incident=diagnostic.incident,
+            known_asset_ids=result.known_asset_ids,
+            task_state=investigating_state,
+            available_tools=result.available_tools,
+            working_memory=matching_memories[-1],
+            executions=prior_executions,
+            hypotheses=hypotheses,
+        )
+        for score in planner.candidate_scores(context):
+            parameters = dict(score.probe.parameters)
+            selected = (
+                score.probe.tool_name == execution.action.tool_name
+                and parameters == dict(execution.action.parameters)
+            )
+            rows.append(
+                PlannerCandidateView(
+                    step=index + 1,
+                    tool=score.probe.tool_name,
+                    parameters=str(parameters),
+                    information_value=score.probe.information_value,
+                    unresolved_coverage=score.unresolved_coverage,
+                    execution_cost=score.probe.execution_cost,
+                    risk_cost=score.risk_cost,
+                    repeat_cost=score.repeat_cost,
+                    utility=score.utility,
+                    eligible=score.utility > 0.0 and score.repeat_cost == 0.0,
+                    selected=selected,
+                )
+            )
+    return tuple(rows)
+
+
+def _planner_audit_trace(candidates: tuple[PlannerCandidateView, ...]) -> str:
+    if not candidates:
+        return ""
+    lines = ["", "Planner 候選決策："]
+    current_step = 0
+    for candidate in candidates:
+        if candidate.step != current_step:
+            current_step = candidate.step
+            lines.append(f"- 決策步驟 {current_step}：")
+        lines.append(
+            f"  {candidate.tool}{candidate.parameters} | "
+            f"utility={candidate.utility:.3f} | "
+            f"coverage={candidate.unresolved_coverage:.3f} | "
+            f"information={candidate.information_value:.3f} | "
+            f"cost={candidate.execution_cost:.3f} | "
+            f"risk={candidate.risk_cost:.3f} | "
+            f"repeat={candidate.repeat_cost:.3f} | "
+            f"eligible={'yes' if candidate.eligible else 'no'} | "
+            f"selected={'yes' if candidate.selected else 'no'}"
+        )
+    return "\n".join(lines)
+
+
 def _safety(result: BenchmarkCaseResult) -> SafetyView | None:
     if result.run.safety_review is None:
         return None
@@ -246,6 +420,9 @@ def _failures(result: BenchmarkCaseResult) -> tuple[FailureView, ...]:
 
 def build_case_presentation(result: BenchmarkCaseResult) -> CasePresentation:
     """Build all cards and tables required by the single-case UI."""
+    planner_candidates = _planner_candidates(result)
+    trace_text = localize_trace(render_benchmark_trace(result))
+    planner_trace = _planner_audit_trace(planner_candidates)
     return CasePresentation(
         case_id=result.case_id,
         incident_id=result.expectation.incident_id,
@@ -262,11 +439,13 @@ def build_case_presentation(result: BenchmarkCaseResult) -> CasePresentation:
         handoffs=_handoffs(result),
         action_attempts=_action_attempts(result),
         hypotheses=_hypotheses(result),
+        hypothesis_timeline=_hypothesis_timeline(result),
+        planner_candidates=planner_candidates,
         evidence=_evidence(result),
         safety=_safety(result),
         report=_report(result),
         failures=_failures(result),
-        trace_text=localize_trace(render_benchmark_trace(result)),
+        trace_text=trace_text + planner_trace,
     )
 
 

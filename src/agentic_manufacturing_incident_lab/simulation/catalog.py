@@ -1,5 +1,6 @@
 """Factory functions for reproducible synthetic incident scenarios."""
 
+from dataclasses import replace
 from datetime import UTC, datetime
 
 from agentic_manufacturing_incident_lab.domain.models import Incident, IncidentSeverity
@@ -7,6 +8,7 @@ from agentic_manufacturing_incident_lab.simulation.scenario import (
     AssetRole,
     AssetTruth,
     ScenarioDefinition,
+    SourceQualityProfile,
 )
 
 
@@ -243,3 +245,69 @@ def build_sensor_staleness_scenario(seed: int = 117) -> ScenarioDefinition:
 def build_configuration_drift_scenario(seed: int = 118) -> ScenarioDefinition:
     """Build the same symptom with a mismatched recipe configuration."""
     return _build_flatline_scenario(seed=seed, configuration_drift=True)
+
+
+def _replace_affected_asset(
+    scenario: ScenarioDefinition,
+    **changes,
+) -> tuple[AssetTruth, ...]:
+    return tuple(
+        replace(asset, **changes)
+        if asset.asset_id == scenario.incident.asset_id
+        else asset
+        for asset in scenario.assets
+    )
+
+
+def build_conflicting_sensor_signal_scenario(seed: int = 119) -> ScenarioDefinition:
+    """Build a stale-sensor alarm contradicted by a fresh direct measurement."""
+    base = build_sensor_staleness_scenario(seed=seed)
+    return replace(
+        base,
+        scenario_id="manufacturing-signal-flatline-conflicting-sensor-data",
+        title="Process signal flatline with conflicting sensor evidence",
+        assets=_replace_affected_asset(
+            base,
+            sensor_fresh=True,
+            sensor_age_seconds=0,
+        ),
+        root_cause_code="simulated_alarm_sensor_measurement_conflict",
+    )
+
+
+def build_low_quality_configuration_scenario(seed: int = 120) -> ScenarioDefinition:
+    """Build configuration drift whose direct store observation is too stale."""
+    base = build_configuration_drift_scenario(seed=seed)
+    return replace(
+        base,
+        scenario_id="manufacturing-signal-flatline-low-quality-configuration",
+        title="Process signal flatline with stale configuration evidence",
+        source_quality_profiles=(
+            SourceQualityProfile(
+                source="simulated_configuration_store",
+                freshness=0.40,
+            ),
+        ),
+        root_cause_code="simulated_unconfirmed_configuration_drift",
+    )
+
+
+def build_multi_cause_flatline_scenario(seed: int = 121) -> ScenarioDefinition:
+    """Build simultaneous sensor staleness and configuration drift evidence."""
+    base = build_configuration_drift_scenario(seed=seed)
+    return replace(
+        base,
+        scenario_id="manufacturing-signal-flatline-multiple-supported-causes",
+        title="Process signal flatline with multiple supported causes",
+        assets=_replace_affected_asset(
+            base,
+            sensor_fresh=False,
+            sensor_age_seconds=1860,
+            alarm_codes=(
+                "CONFIG_VERSION_MISMATCH",
+                "SENSOR_STALE",
+                "PROCESS_SIGNAL_FLATLINE",
+            ),
+        ),
+        root_cause_code="simulated_multiple_concurrent_causes",
+    )

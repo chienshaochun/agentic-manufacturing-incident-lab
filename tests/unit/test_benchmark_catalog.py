@@ -26,12 +26,12 @@ def case_by_id(case_id: str) -> BenchmarkCase:
     return next(case for case in catalog() if case.case_id == case_id)
 
 
-def test_catalog_has_unique_eight_controlled_cases() -> None:
+def test_catalog_has_unique_eleven_controlled_cases() -> None:
     cases = catalog()
 
     assert isinstance(cases, tuple)
-    assert len(cases) == 8
-    assert len({case.case_id for case in cases}) == 8
+    assert len(cases) == 11
+    assert len({case.case_id for case in cases}) == 11
 
 
 def test_flatline_cases_share_symptom_but_expect_different_causes() -> None:

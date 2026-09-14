@@ -86,3 +86,53 @@ def test_observation_is_linked_to_incident_and_preserves_evidence() -> None:
     assert observation.values["reachable"] is False
     with pytest.raises(TypeError):
         observation.values["reachable"] = True  # type: ignore[index]
+
+
+def test_observation_quality_defaults_to_fully_trusted() -> None:
+    observation = Observation(
+        observation_id="OBS-QUALITY-001",
+        incident_id="INC-001",
+        source="connectivity_probe",
+        kind=ObservationKind.CONNECTIVITY,
+        summary="Trusted current measurement.",
+        observed_at=datetime(2026, 8, 23, 8, 2, tzinfo=UTC),
+    )
+
+    assert observation.source_reliability == 1.0
+    assert observation.measurement_quality == 1.0
+    assert observation.freshness == 1.0
+    assert observation.quality_factor == 1.0
+
+
+def test_observation_quality_combines_source_measurement_and_freshness() -> None:
+    observation = Observation(
+        observation_id="OBS-QUALITY-002",
+        incident_id="INC-001",
+        source="historian",
+        kind=ObservationKind.METRIC,
+        summary="Aged historian measurement.",
+        observed_at=datetime(2026, 8, 23, 8, 2, tzinfo=UTC),
+        source_reliability=0.8,
+        measurement_quality=0.5,
+        freshness=0.25,
+    )
+
+    assert observation.quality_factor == pytest.approx(0.1)
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    ["source_reliability", "measurement_quality", "freshness"],
+)
+@pytest.mark.parametrize("value", [-0.01, 1.01, True, "1.0"])
+def test_observation_rejects_invalid_quality_score(field_name, value) -> None:
+    with pytest.raises(ValueError, match=field_name):
+        Observation(
+            observation_id="OBS-QUALITY-003",
+            incident_id="INC-001",
+            source="historian",
+            kind=ObservationKind.METRIC,
+            summary="Invalid quality.",
+            observed_at=datetime(2026, 8, 23, 8, 2, tzinfo=UTC),
+            **{field_name: value},
+        )

@@ -106,17 +106,17 @@ def test_contradictory_approval_is_detected_before_report_request() -> None:
     )
 
 
-def test_full_catalog_and_runner_cover_all_thirteen_cases() -> None:
+def test_full_catalog_and_runner_cover_all_sixteen_cases() -> None:
     cases = build_phase7_benchmark_catalog()
     summary = run_phase7_benchmark()
 
-    assert len(cases) == 13
-    assert summary.case_count == 13
-    assert summary.passed_count == 13
+    assert len(cases) == 16
+    assert summary.case_count == 16
+    assert summary.passed_count == 16
     assert summary.mean_evidence_precision == 1.0
     assert summary.mean_evidence_recall == 1.0
-    assert summary.total_tool_calls == 33
-    assert summary.total_handoffs == 56
+    assert summary.total_tool_calls == 51
+    assert summary.total_handoffs == 68
     assert summary.all_passed is True
 
 

@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import timedelta
 
 import pytest
@@ -5,6 +6,7 @@ import pytest
 from agentic_manufacturing_incident_lab.domain.models import ObservationKind
 from agentic_manufacturing_incident_lab.simulation import (
     SimulatedEnvironment,
+    SourceQualityProfile,
     build_station_connectivity_scenario,
 )
 
@@ -91,3 +93,24 @@ def test_unknown_asset_does_not_advance_environment() -> None:
 
     assert environment.observation_count == 0
     assert environment.current_time == environment.brief.incident.reported_at
+
+
+def test_environment_applies_source_quality_profile_to_observation() -> None:
+    scenario = replace(
+        build_station_connectivity_scenario(seed=43),
+        source_quality_profiles=(
+            SourceQualityProfile(
+                source="simulated_connectivity_sensor",
+                source_reliability=0.8,
+                measurement_quality=0.5,
+                freshness=0.25,
+            ),
+        ),
+    )
+
+    observation = SimulatedEnvironment(scenario).measure_connectivity("ST-02")
+
+    assert observation.source_reliability == 0.8
+    assert observation.measurement_quality == 0.5
+    assert observation.freshness == 0.25
+    assert observation.quality_factor == pytest.approx(0.1)

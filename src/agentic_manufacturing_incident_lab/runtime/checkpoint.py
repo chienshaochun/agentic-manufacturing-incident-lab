@@ -56,7 +56,7 @@ from agentic_manufacturing_incident_lab.safety import (
     SafetyDisposition,
 )
 
-CHECKPOINT_SCHEMA_VERSION = 4
+CHECKPOINT_SCHEMA_VERSION = 5
 CHECKPOINT_KIND = "agentic_manufacturing_investigation"
 
 
@@ -243,6 +243,9 @@ def _encode_execution(record: ActionExecutionRecord) -> dict[str, Any]:
                 "kind": observation.kind.value,
                 "observation_id": observation.observation_id,
                 "observed_at": observation.observed_at.isoformat(),
+                "source_reliability": observation.source_reliability,
+                "measurement_quality": observation.measurement_quality,
+                "freshness": observation.freshness,
                 "source": observation.source,
                 "summary": observation.summary,
                 "values": dict(observation.values),
@@ -705,6 +708,9 @@ def _decode_observation(data: dict[str, Any]) -> Observation:
             "kind",
             "observation_id",
             "observed_at",
+            "source_reliability",
+            "measurement_quality",
+            "freshness",
             "source",
             "summary",
             "values",
@@ -719,6 +725,13 @@ def _decode_observation(data: dict[str, Any]) -> Observation:
         summary=_require_string(data["summary"], "summary"),
         observed_at=_decode_datetime(data["observed_at"], "observed_at"),
         values=_decode_scalar_mapping(data["values"], "values"),
+        source_reliability=_require_finite_number(
+            data["source_reliability"], "source_reliability"
+        ),
+        measurement_quality=_require_finite_number(
+            data["measurement_quality"], "measurement_quality"
+        ),
+        freshness=_require_finite_number(data["freshness"], "freshness"),
     )
 
 
@@ -903,6 +916,12 @@ def _require_integer(value: Any, name: str) -> int:
     if type(value) is not int:
         raise CheckpointError(f"{name} must be an integer")
     return value
+
+
+def _require_finite_number(value: Any, name: str) -> float:
+    if type(value) not in (int, float) or not math.isfinite(value):
+        raise CheckpointError(f"{name} must be a finite number")
+    return float(value)
 
 
 def _decode_datetime(value: Any, name: str) -> datetime:

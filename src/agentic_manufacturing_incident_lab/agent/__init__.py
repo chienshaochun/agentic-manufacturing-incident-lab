@@ -31,6 +31,11 @@ from agentic_manufacturing_incident_lab.agent.rule_based import RuleBasedPlanner
 from agentic_manufacturing_incident_lab.agent.manufacturing_signal import (
     ManufacturingSignalPlanner,
 )
+from agentic_manufacturing_incident_lab.agent.structured_llm import (
+    StructuredLLMPlanner,
+    StructuredPlannerInvoker,
+    StructuredPlannerResponseError,
+)
 
 __all__ = [
     "ActionDecision",
@@ -48,6 +53,9 @@ __all__ = [
     "SingleAgentRunner",
     "StepBudget",
     "StepBudgetExceeded",
+    "StructuredLLMPlanner",
+    "StructuredPlannerInvoker",
+    "StructuredPlannerResponseError",
     "StopDecision",
     "StopReason",
     "WorkingMemory",

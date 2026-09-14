@@ -292,3 +292,106 @@ class ConnectivityHypothesisPolicy:
             weight=weight,
             rationale=rationale,
         )
+
+
+class ManufacturingSignalHypothesisPolicy:
+    """Evaluate competing causes of a flatlined manufacturing signal."""
+
+    name = "manufacturing_signal_hypotheses_v1"
+
+    def evaluate(
+        self,
+        incident: Incident,
+        observations: tuple[Observation, ...],
+        *,
+        evaluated_at: datetime,
+    ) -> tuple[Hypothesis, ...]:
+        definitions = self._definitions(incident)
+        signals = tuple(
+            signal
+            for observation in observations
+            for signal in self._signals(observation, definitions)
+        )
+        return evaluate_hypotheses(
+            incident=incident,
+            definitions=definitions,
+            signals=signals,
+            evaluated_at=evaluated_at,
+        )
+
+    @staticmethod
+    def _definitions(incident: Incident) -> tuple[HypothesisDefinition, ...]:
+        prefix = f"HYP-{incident.incident_id}"
+        asset = incident.asset_id
+        return (
+            HypothesisDefinition(f"{prefix}-NETWORK", f"The network path for {asset} is unavailable."),
+            HypothesisDefinition(f"{prefix}-TELEMETRY", f"The telemetry service for {asset} is unavailable."),
+            HypothesisDefinition(f"{prefix}-CONFIG", f"Configuration drift affects {asset}."),
+            HypothesisDefinition(f"{prefix}-MAINTENANCE", f"Planned maintenance explains the signal gap on {asset}."),
+            HypothesisDefinition(f"{prefix}-SENSOR", f"Sensor data on {asset} is stale."),
+        )
+
+    @classmethod
+    def _signals(
+        cls,
+        observation: Observation,
+        definitions: tuple[HypothesisDefinition, ...],
+    ) -> tuple[HypothesisSignal, ...]:
+        ids = {
+            suffix: next(item.hypothesis_id for item in definitions if item.hypothesis_id.endswith(suffix))
+            for suffix in ("-NETWORK", "-TELEMETRY", "-CONFIG", "-MAINTENANCE", "-SENSOR")
+        }
+        signals: list[HypothesisSignal] = []
+
+        codes = {
+            code for code in str(observation.values.get("alarm_codes_csv", "")).split(",")
+            if code
+        }
+        alarm_map = {
+            "SENSOR_STALE": ("-SENSOR", "Alarm history contains SENSOR_STALE."),
+            "CONFIG_VERSION_MISMATCH": ("-CONFIG", "Alarm history contains CONFIG_VERSION_MISMATCH."),
+            "TELEMETRY_MISSING": ("-TELEMETRY", "Alarm history contains TELEMETRY_MISSING."),
+        }
+        for code, (suffix, rationale) in alarm_map.items():
+            if code in codes:
+                signals.append(cls._signal(ids[suffix], observation, True, 0.30, rationale))
+
+        boolean_rules = (
+            ("network_reachable", "-NETWORK", False),
+            ("telemetry_available", "-TELEMETRY", False),
+            ("configuration_matches", "-CONFIG", False),
+            ("maintenance_active", "-MAINTENANCE", True),
+            ("sensor_fresh", "-SENSOR", False),
+        )
+        for key, suffix, failure_value in boolean_rules:
+            value = observation.values.get(key)
+            if not isinstance(value, bool):
+                continue
+            supports = value is failure_value
+            weight = 0.70 if supports and suffix in {"-SENSOR", "-CONFIG", "-TELEMETRY"} else 1.00
+            signals.append(
+                cls._signal(
+                    ids[suffix],
+                    observation,
+                    supports,
+                    weight,
+                    f"Observed {key}={value}.",
+                )
+            )
+        return tuple(signals)
+
+    @staticmethod
+    def _signal(
+        hypothesis_id: str,
+        observation: Observation,
+        supports: bool,
+        weight: float,
+        rationale: str,
+    ) -> HypothesisSignal:
+        return HypothesisSignal(
+            hypothesis_id=hypothesis_id,
+            observation_id=observation.observation_id,
+            effect=HypothesisEffect.SUPPORTS if supports else HypothesisEffect.CONTRADICTS,
+            weight=weight,
+            rationale=rationale,
+        )

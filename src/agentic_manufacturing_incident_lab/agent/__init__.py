@@ -28,6 +28,9 @@ from agentic_manufacturing_incident_lab.agent.memory import (
     record_action_memory,
 )
 from agentic_manufacturing_incident_lab.agent.rule_based import RuleBasedPlanner
+from agentic_manufacturing_incident_lab.agent.manufacturing_signal import (
+    ManufacturingSignalPlanner,
+)
 
 __all__ = [
     "ActionDecision",
@@ -36,6 +39,7 @@ __all__ = [
     "DiagnosticProbe",
     "HypothesisDrivenPlanner",
     "MemoryFact",
+    "ManufacturingSignalPlanner",
     "OpenQuestion",
     "PlanningDecision",
     "PlanningPolicy",

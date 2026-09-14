@@ -104,6 +104,20 @@
 
 物理意義：操作員只回報看得到的異常；系統在白板上逐步更新候選原因，而不是先把標準答案放進下拉選單。
 
+完成狀態：已完成；見 [Phase 15 說明](PHASE_15_INVESTIGATION_UX.md)。
+
+## Phase 16：結構化 Incident Intake
+
+在自然語言模型之前先建立嚴格 Schema、Parser 介面、手動 fallback 與操作員確認閘門。只有通過型別、欄位、設備範圍與症狀 allowlist 驗證的資料才能進入 Agent 流程。
+
+物理意義：先建立標準報修單與簽名確認流程，再讓語言模型協助填表；模型不能自行新增欄位、宣告 Root Cause 或繞過操作員。
+
+完成狀態：已完成；見 [Phase 16 說明](PHASE_16_STRUCTURED_INCIDENT_INTAKE.md)。
+
+## Phase 17：Ollama Structured Parser
+
+讓本機 Ollama 只負責把操作員文字轉成 Phase 16 Schema，並加入逾時、格式錯誤、低信心 fallback 與模型／人工結果比較。此階段暫緩，等確認本機硬體、模型大小與部署模式後再實作。
+
 ## 技術採用順序
 
 - 核心先使用 Python 3.12 與標準函式庫，保持行為透明。

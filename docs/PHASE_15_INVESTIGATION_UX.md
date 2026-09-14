@@ -81,7 +81,7 @@ Phase 15 的測試涵蓋：
 
 ## 尚未完成的限制
 
-- 操作員自由文字尚未轉成結構化 Incident；未來可加入 schema-constrained parser，但仍須保留 allowlist 與 fallback。
+- Phase 16 已建立結構化 Incident Intake、Parser 契約與人工確認；自由文字仍要等 Ollama adapter 才會自動解析。
 - 模擬批次仍是人工建立的合成環境，不能代表實際工廠故障分布。
 - Hypothesis 時間線是依既有紀錄重播，尚未作為獨立 event stream 永久儲存。
 - Utility 係數目前是工程設計值，尚未從歷史工單、Tool 延遲與風險資料校準。

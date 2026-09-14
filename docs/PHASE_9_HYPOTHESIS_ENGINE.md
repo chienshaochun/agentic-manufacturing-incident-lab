@@ -34,7 +34,7 @@ Evidence
 - 同一筆 Observation 不得同時支持又反對同一假設。
 - `supported` 必須至少引用一筆支持 Observation。
 - `rejected` 必須至少引用一筆反對 Observation。
-- Hypothesis 會保存在 InvestigationRun 與 checkpoint schema v4。
+- Hypothesis 會保存在 InvestigationRun；Phase 14 新增 Observation 品質欄位後，checkpoint schema 已更新至 v5。
 - UI 與下載報告會分開呈現 Hypothesis 與 Evidence。
 
 ## 目前限制

@@ -45,7 +45,7 @@ CASE_LABELS = {
 WORKBENCH_PAGE = "事件調查台 Incident Workbench"
 BENCHMARK_PAGE = "基準測試 Benchmark Dashboard"
 ABOUT_PAGE = "關於專案 About"
-APP_RELEASE = "Agent Evaluation & Planner A/B v1"
+APP_RELEASE = "Evidence Quality & Uncertainty v1"
 
 
 def _metric_grid(metrics) -> None:

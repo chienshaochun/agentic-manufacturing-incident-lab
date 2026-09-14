@@ -45,7 +45,7 @@ def test_app_loads_incident_workbench_without_running_case() -> None:
     assert app.selectbox[0].value == "isolated-station-seed-43"
     assert app.button[0].label == "執行調查 Run investigation"
     assert any("請選擇案例" in info.value for info in app.info)
-    assert any("介面版本：Agent Evaluation & Planner A/B v1" in caption.value for caption in app.caption)
+    assert any("介面版本：Evidence Quality & Uncertainty v1" in caption.value for caption in app.caption)
 
 
 def test_run_button_executes_default_case_and_displays_metrics() -> None:

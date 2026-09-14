@@ -40,9 +40,11 @@
 
 詳細邊界與驗收條件見 [產品契約](docs/PRODUCT_CONTRACT.md)，逐步實作方式見 [學習路線圖](docs/LEARNING_ROADMAP.md)，Phase 1 的資料關係見 [領域模型](docs/DOMAIN_MODEL.md)，Phase 2 的執行架構見 [模擬環境與工具系統](docs/PHASE_2_SIMULATOR_AND_TOOLS.md)，Phase 3 的決策流程見 [單一 Agent 決策循環](docs/PHASE_3_SINGLE_AGENT_LOOP.md)，Phase 4 的恢復架構見 [工作記憶與 Checkpoint](docs/PHASE_4_MEMORY_AND_CHECKPOINTS.md)，Phase 5 的安全邊界見 [批准、安全與故障恢復](docs/PHASE_5_SAFETY_AND_RECOVERY.md)，Phase 6 的角色分工見 [多 Agent 協作與比較](docs/PHASE_6_MULTI_AGENT_COLLABORATION.md)，Phase 7 的量化驗證見 [評估、故障注入與可觀測性](docs/PHASE_7_EVALUATION_AND_OBSERVABILITY.md)，Phase 8 的完整操作方式見 [Streamlit 事件調查操作台](docs/PHASE_8_STREAMLIT_WORKBENCH.md)，Phase 9 的假設推理見 [Hypothesis Engine](docs/PHASE_9_HYPOTHESIS_ENGINE.md)，Phase 10 的決策方式見 [動態工具選擇](docs/PHASE_10_DYNAMIC_TOOL_SELECTION.md)，Phase 11 的跨來源案例見 [多來源製造診斷情境](docs/PHASE_11_REALISTIC_MANUFACTURING_SCENARIOS.md)，Phase 12 的模型邊界見 [結構化 LLM Planner](docs/PHASE_12_STRUCTURED_LLM_ADAPTER.md)，Phase 13 的驗證方式見 [Agent 能力評估與 Planner A/B](docs/PHASE_13_AGENT_EVALUATION.md)。
 
+Phase 14 的可靠性設計見 [Evidence 品質與不確定性](docs/PHASE_14_EVIDENCE_QUALITY.md)。
+
 ## 目前進度
 
-Phase 13 已完成：13 個 controlled cases 除了檢查答案、狀態、安全與成本，也量測假設解析率、無根據主張率、重複 Tool 率、Evidence 所需 Action 與恢復成功率。Benchmark Dashboard 另提供 rule-based 與 hypothesis-driven Planner 的同案例 A/B 結果。
+Phase 14 已完成：16 個 controlled cases 除了檢查答案、狀態、安全與成本，也驗證 Observation 品質、跨來源支持、矛盾訊號與多重原因。證據不足、來源過期或無法收斂到單一原因時，系統會保留不確定性並安全停止，不會硬產生 Evidence。
 
 ## 本機手動演練
 

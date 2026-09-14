@@ -21,6 +21,7 @@ from agentic_manufacturing_incident_lab.presentation.models import (
     HypothesisTimelineView,
     HypothesisView,
     MetricCard,
+    PlannerCandidateView,
     ReportView,
     SafetyView,
 )
@@ -36,6 +37,7 @@ __all__ = [
     "HypothesisTimelineView",
     "HypothesisView",
     "MetricCard",
+    "PlannerCandidateView",
     "ReportView",
     "SafetyView",
     "benchmark_csv",

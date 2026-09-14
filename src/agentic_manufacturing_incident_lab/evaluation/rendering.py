@@ -140,6 +140,31 @@ def render_benchmark_trace(result: BenchmarkCaseResult) -> str:
                     f"   observe {observation.observation_id}: "
                     f"{observation.summary} values={dict(observation.values)}"
                 )
+                lines.append(
+                    "   observation quality: "
+                    f"source_reliability={observation.source_reliability:.2f}, "
+                    f"measurement_quality={observation.measurement_quality:.2f}, "
+                    f"freshness={observation.freshness:.2f}, "
+                    f"combined={observation.quality_factor:.2f}"
+                )
+
+    lines.extend(("", "Hypotheses:"))
+    if diagnostic is None or not diagnostic.hypotheses:
+        lines.append("- none")
+    else:
+        for hypothesis in diagnostic.hypotheses:
+            lines.extend(
+                (
+                    f"- {hypothesis.hypothesis_id}: {hypothesis.statement}",
+                    f"  status: {hypothesis.status.value}",
+                    f"  confidence: {hypothesis.confidence:.2f}",
+                    "  supports: "
+                    + (", ".join(hypothesis.supporting_observation_ids) or "none"),
+                    "  contradicts: "
+                    + (", ".join(hypothesis.contradicting_observation_ids) or "none"),
+                    f"  scoring: {hypothesis.rationale}",
+                )
+            )
 
     lines.extend(("", "Evidence:"))
     if diagnostic is None or not diagnostic.evidence:

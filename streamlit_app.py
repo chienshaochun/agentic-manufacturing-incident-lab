@@ -232,6 +232,33 @@ def _render_case_details(view: CasePresentation) -> None:
             st.info("Diagnostic Agent 沒有產生可顯示的診斷假設。")
 
     with action_tab:
+        st.markdown("#### Planner 候選決策")
+        st.caption(
+            "每一步都先替所有候選 Tool 計算 Utility = Information × 未解假設涵蓋率 "
+            "− 執行成本 − 風險成本 − 重複成本；selected 才是實際執行者。"
+        )
+        if view.planner_candidates:
+            st.dataframe(
+                [asdict(candidate) for candidate in view.planner_candidates],
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "step": "決策步驟",
+                    "tool": "候選 Tool",
+                    "parameters": "參數",
+                    "information_value": "資訊價值",
+                    "unresolved_coverage": "未解假設涵蓋率",
+                    "execution_cost": "執行成本",
+                    "risk_cost": "風險成本",
+                    "repeat_cost": "重複成本",
+                    "utility": "Utility",
+                    "eligible": "符合資格",
+                    "selected": "實際選擇",
+                },
+            )
+        else:
+            st.info("本次執行沒有可重建的 Planner 候選評分。")
+
         st.markdown("#### 診斷動作與實際嘗試")
         st.caption("一個邏輯 Action 在重試時，可能包含多個實際 Attempt。")
         st.caption(

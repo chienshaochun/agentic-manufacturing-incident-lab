@@ -32,6 +32,7 @@ from agentic_manufacturing_incident_lab.evaluation.agent_metrics import (
     measure_agent_operations,
 )
 from agentic_manufacturing_incident_lab.tools import (
+    ToolSpec,
     build_diagnostic_registry,
     build_manufacturing_diagnostic_registry,
 )
@@ -109,6 +110,9 @@ class BenchmarkCaseResult:
     expectation: BenchmarkExpectation
     run: MultiAgentRun
     metrics: BenchmarkMetrics
+    planner_name: str = ""
+    known_asset_ids: tuple[str, ...] = ()
+    available_tools: tuple[ToolSpec, ...] = ()
 
     def __post_init__(self) -> None:
         if self.run.ledger.incident_id != self.expectation.incident_id:
@@ -121,6 +125,17 @@ class BenchmarkCaseResult:
             raise ValueError(
                 "metrics collaboration_failure_count must match the run"
             )
+        known_asset_ids = tuple(self.known_asset_ids)
+        available_tools = tuple(self.available_tools)
+        if len(set(known_asset_ids)) != len(known_asset_ids):
+            raise ValueError("known_asset_ids must be unique")
+        tool_names = tuple(spec.name for spec in available_tools)
+        if len(set(tool_names)) != len(tool_names):
+            raise ValueError("available_tools must have unique names")
+        if self.planner_name and (not known_asset_ids or not available_tools):
+            raise ValueError("planner metadata requires assets and available tools")
+        object.__setattr__(self, "known_asset_ids", known_asset_ids)
+        object.__setattr__(self, "available_tools", available_tools)
 
     @property
     def case_id(self) -> str:
@@ -228,6 +243,10 @@ class BenchmarkSummary:
 def evaluate_benchmark_run(
     expectation: BenchmarkExpectation,
     run: MultiAgentRun,
+    *,
+    planner_name: str = "",
+    known_asset_ids: tuple[str, ...] = (),
+    available_tools: tuple[ToolSpec, ...] = (),
 ) -> BenchmarkCaseResult:
     """Compare one actual multi-agent run with a controlled answer key."""
     if run.ledger.incident_id != expectation.incident_id:
@@ -297,6 +316,9 @@ def evaluate_benchmark_run(
         expectation=expectation,
         run=run,
         metrics=metrics,
+        planner_name=planner_name,
+        known_asset_ids=known_asset_ids,
+        available_tools=available_tools,
     )
 
 
@@ -305,16 +327,20 @@ def run_benchmark_case(case: BenchmarkCase) -> BenchmarkCaseResult:
     environment = SimulatedEnvironment(case.scenario)
     brief = environment.brief
     if case.scenario.scenario_id.startswith("manufacturing-signal-flatline-"):
+        planner = ManufacturingSignalPlanner()
+        registry = build_manufacturing_diagnostic_registry(environment)
         diagnostic = DiagnosticAgent(
-            policy=ManufacturingSignalPlanner(),
-            registry=build_manufacturing_diagnostic_registry(environment),
+            policy=planner,
+            registry=registry,
             hypothesis_policy=ManufacturingSignalHypothesisPolicy(),
             action_limit=case.action_limit,
         )
     else:
+        planner = HypothesisDrivenPlanner()
+        registry = build_diagnostic_registry(environment)
         diagnostic = DiagnosticAgent(
-            policy=HypothesisDrivenPlanner(),
-            registry=build_diagnostic_registry(environment),
+            policy=planner,
+            registry=registry,
             action_limit=case.action_limit,
         )
     safety_reviewer = SafetyReviewerAgent()
@@ -338,7 +364,13 @@ def run_benchmark_case(case: BenchmarkCase) -> BenchmarkCaseResult:
         incident=brief.incident,
         known_asset_ids=brief.known_asset_ids,
     )
-    return evaluate_benchmark_run(case.expectation, run)
+    return evaluate_benchmark_run(
+        case.expectation,
+        run,
+        planner_name=planner.name,
+        known_asset_ids=brief.known_asset_ids,
+        available_tools=registry.specs,
+    )
 
 
 def run_controlled_benchmark(

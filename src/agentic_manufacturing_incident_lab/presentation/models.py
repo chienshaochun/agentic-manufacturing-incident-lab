@@ -68,6 +68,21 @@ class HypothesisTimelineView:
 
 
 @dataclass(frozen=True, slots=True)
+class PlannerCandidateView:
+    step: int
+    tool: str
+    parameters: str
+    information_value: float
+    unresolved_coverage: float
+    execution_cost: float
+    risk_cost: float
+    repeat_cost: float
+    utility: float
+    eligible: bool
+    selected: bool
+
+
+@dataclass(frozen=True, slots=True)
 class SafetyView:
     outcome: str
     rationale: str
@@ -107,6 +122,7 @@ class CasePresentation:
     action_attempts: tuple[ActionAttemptView, ...]
     hypotheses: tuple[HypothesisView, ...]
     hypothesis_timeline: tuple[HypothesisTimelineView, ...]
+    planner_candidates: tuple[PlannerCandidateView, ...]
     evidence: tuple[EvidenceView, ...]
     safety: SafetyView | None
     report: ReportView | None

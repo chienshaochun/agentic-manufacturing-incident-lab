@@ -35,6 +35,11 @@ def test_completed_trace_contains_actions_evidence_review_and_report() -> None:
     assert "Diagnostic actions and physical attempts:" in rendered
     assert "check_connectivity({'asset_id': 'ST-02'})" in rendered
     assert "attempt 1: succeeded" in rendered
+    assert "observation quality:" in rendered
+    assert "combined=1.00" in rendered
+    assert "Hypotheses:" in rendered
+    assert "status: supported" in rendered
+    assert "supports: INC-CONNECTIVITY-0043-OBS-001" in rendered
     assert "Evidence:" in rendered
     assert "The observed connectivity failure is isolated to ST-02." in rendered
     assert "- outcome: approved" in rendered

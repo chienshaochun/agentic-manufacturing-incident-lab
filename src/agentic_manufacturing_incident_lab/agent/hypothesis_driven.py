@@ -116,6 +116,13 @@ class HypothesisDrivenPlanner:
     def __init__(self) -> None:
         self._terminal_policy = RuleBasedPlanner()
 
+    def candidate_scores(self, context: AgentContext) -> tuple[ProbeScore, ...]:
+        """Return every current probe score for deterministic decision auditing."""
+        return tuple(
+            score_probe(context, probe)
+            for probe in self._candidate_probes(context)
+        )
+
     def decide(self, context: AgentContext) -> PlanningDecision:
         """Use legacy completion gates but dynamically rank measurement options."""
         terminal_or_next = self._terminal_policy.decide(context)
@@ -127,10 +134,7 @@ class HypothesisDrivenPlanner:
                 rationale="Hypothesis-aware planning requires candidate hypotheses.",
             )
 
-        scores = tuple(
-            score_probe(context, probe)
-            for probe in self._candidate_probes(context)
-        )
+        scores = self.candidate_scores(context)
         eligible = tuple(
             score
             for score in scores

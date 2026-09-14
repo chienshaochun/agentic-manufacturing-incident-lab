@@ -64,6 +64,22 @@ def test_action_attempt_view_separates_action_and_physical_attempt() -> None:
     assert "network_reachable" in first.observations
 
 
+def test_planner_candidates_show_alternatives_and_selected_maximum() -> None:
+    view = build_case_presentation(case_result("isolated-station-seed-43"))
+
+    assert len(view.planner_candidates) == 7
+    for step in (1, 2, 3):
+        candidates = tuple(row for row in view.planner_candidates if row.step == step)
+        selected = tuple(row for row in candidates if row.selected)
+        assert len(selected) == 1
+        assert selected[0].eligible is True
+        assert selected[0].utility == max(
+            row.utility for row in candidates if row.eligible
+        )
+    assert "Planner 候選決策" in view.trace_text
+    assert "selected=yes" in view.trace_text
+
+
 def test_hypothesis_timeline_preserves_observation_quality_and_links() -> None:
     view = build_case_presentation(
         case_result("low-quality-configuration-evidence-seed-120")
@@ -91,6 +107,7 @@ def test_diagnostic_failure_presentation_has_failure_but_no_products() -> None:
     assert view.action_attempts == ()
     assert view.hypotheses == ()
     assert view.hypothesis_timeline == ()
+    assert view.planner_candidates == ()
     assert view.evidence == ()
     assert view.safety is None
     assert view.report is None

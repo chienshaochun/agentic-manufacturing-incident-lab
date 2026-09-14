@@ -35,6 +35,8 @@ def test_case_json_contains_grounded_nested_products() -> None:
     assert document["hypotheses"][0]["status"] == "supported"
     assert len(document["hypothesis_timeline"]) == 12
     assert document["hypothesis_timeline"][0]["status"] == "open"
+    assert len(document["planner_candidates"]) == 7
+    assert sum(row["selected"] for row in document["planner_candidates"]) == 3
     assert len(document["handoffs"]) == 6
 
 

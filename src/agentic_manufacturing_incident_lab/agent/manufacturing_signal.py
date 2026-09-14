@@ -10,6 +10,7 @@ from agentic_manufacturing_incident_lab.agent.contracts import (
 )
 from agentic_manufacturing_incident_lab.agent.hypothesis_driven import (
     DiagnosticProbe,
+    ProbeScore,
     score_probe,
 )
 from agentic_manufacturing_incident_lab.domain import HypothesisStatus
@@ -19,6 +20,13 @@ class ManufacturingSignalPlanner:
     """Investigate flatlined process values across independent data sources."""
 
     name = "manufacturing_signal_utility_v1"
+
+    def candidate_scores(self, context: AgentContext) -> tuple[ProbeScore, ...]:
+        """Return every probe score so decisions can be audited outside the UI."""
+        return tuple(
+            score_probe(context, probe)
+            for probe in self._probes(context.incident.asset_id)
+        )
 
     def decide(self, context: AgentContext) -> PlanningDecision:
         supported = tuple(
@@ -43,9 +51,7 @@ class ManufacturingSignalPlanner:
                 confidence=winner.confidence,
             )
 
-        scores = tuple(
-            score_probe(context, probe) for probe in self._probes(context.incident.asset_id)
-        )
+        scores = self.candidate_scores(context)
         eligible = tuple(
             item for item in scores
             if item.utility > 0.0 and item.repeat_cost == 0.0

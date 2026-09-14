@@ -88,6 +88,8 @@
 
 增加假設解決率、無依據主張率、重複Tool率、Evidence所需Action數與恢復成功率。
 
+完成狀態：已完成，並加入五個 connectivity cases 的 Planner A/B Dashboard。各指標的計算與限制見 [Phase 13 說明](PHASE_13_AGENT_EVALUATION.md)。
+
 ## 技術採用順序
 
 - 核心先使用 Python 3.12 與標準函式庫，保持行為透明。

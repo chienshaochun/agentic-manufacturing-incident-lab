@@ -366,7 +366,7 @@ def build_specialist_failure_catalog() -> tuple[BenchmarkCase, ...]:
 
 
 def build_phase7_benchmark_catalog() -> tuple[BenchmarkCase, ...]:
-    """Return all behavior and specialist-failure cases for Phase 7."""
+    """Return all cases; retained as a compatibility name from Phase 7."""
     cases = (
         *build_controlled_benchmark_catalog(),
         *build_specialist_failure_catalog(),
@@ -375,3 +375,8 @@ def build_phase7_benchmark_catalog() -> tuple[BenchmarkCase, ...]:
     if len(set(case_ids)) != len(case_ids):
         raise ValueError("Phase 7 benchmark case_id values must be unique")
     return cases
+
+
+def build_benchmark_catalog() -> tuple[BenchmarkCase, ...]:
+    """Return the current complete benchmark catalog."""
+    return build_phase7_benchmark_catalog()

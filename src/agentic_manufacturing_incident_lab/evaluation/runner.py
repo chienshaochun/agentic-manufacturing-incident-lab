@@ -359,5 +359,10 @@ def run_controlled_benchmark(
 
 
 def run_phase7_benchmark() -> BenchmarkSummary:
-    """Execute all controlled behavior and specialist failure cases."""
+    """Execute all cases; retained as a compatibility name from Phase 7."""
     return run_controlled_benchmark(build_phase7_benchmark_catalog())
+
+
+def run_benchmark() -> BenchmarkSummary:
+    """Execute the current complete controlled benchmark."""
+    return run_phase7_benchmark()

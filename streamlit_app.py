@@ -6,9 +6,9 @@ import streamlit as st
 
 from agentic_manufacturing_incident_lab.evaluation import (
     BenchmarkCaseResult,
-    build_phase7_benchmark_catalog,
+    build_benchmark_catalog,
     run_benchmark_case,
-    run_phase7_benchmark,
+    run_benchmark,
     run_planner_comparison,
 )
 from agentic_manufacturing_incident_lab.presentation import (
@@ -57,7 +57,7 @@ def _metric_grid(metrics) -> None:
 
 
 def _case_lookup():
-    return {case.case_id: case for case in build_phase7_benchmark_catalog()}
+    return {case.case_id: case for case in build_benchmark_catalog()}
 
 
 def _run_selected_case(case_id: str) -> None:
@@ -76,7 +76,7 @@ def _current_case_result(case_id: str) -> BenchmarkCaseResult | None:
 
 def _run_full_benchmark() -> None:
     with st.spinner("Running all controlled benchmark cases..."):
-        summary = run_phase7_benchmark()
+        summary = run_benchmark()
     st.session_state["benchmark_view"] = build_benchmark_presentation(summary)
     st.session_state["planner_comparison"] = run_planner_comparison()
 
@@ -389,7 +389,7 @@ def _benchmark_dashboard() -> None:
     json_column.download_button(
         "下載完整 Benchmark (.json)",
         data=benchmark_json(view),
-        file_name="phase-7-benchmark.json",
+        file_name="agent-evaluation-benchmark.json",
         mime="application/json",
         on_click="ignore",
         width="stretch",
@@ -397,7 +397,7 @@ def _benchmark_dashboard() -> None:
     csv_column.download_button(
         "下載案例表格 (.csv)",
         data=benchmark_csv(view),
-        file_name="phase-7-benchmark.csv",
+        file_name="agent-evaluation-benchmark.csv",
         mime="text/csv",
         on_click="ignore",
         width="stretch",
@@ -405,7 +405,7 @@ def _benchmark_dashboard() -> None:
     text_column.download_button(
         "下載彙總結果 (.txt)",
         data=view.summary_text,
-        file_name="phase-7-benchmark.txt",
+        file_name="agent-evaluation-benchmark.txt",
         mime="text/plain",
         on_click="ignore",
         width="stretch",

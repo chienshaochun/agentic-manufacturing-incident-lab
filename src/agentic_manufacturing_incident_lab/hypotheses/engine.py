@@ -27,6 +27,8 @@ class HypothesisDefinition:
     hypothesis_id: str
     statement: str
     prior_confidence: float = 0.25
+    min_supporting_sources: int = 1
+    required_support_sources: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         require_text(self.hypothesis_id, "hypothesis_id")
@@ -36,6 +38,22 @@ class HypothesisDefinition:
             or not 0.0 <= self.prior_confidence <= 1.0
         ):
             raise ValueError("prior_confidence must be between 0.0 and 1.0")
+        if (
+            isinstance(self.min_supporting_sources, bool)
+            or not isinstance(self.min_supporting_sources, int)
+            or self.min_supporting_sources <= 0
+        ):
+            raise ValueError("min_supporting_sources must be a positive integer")
+        required = tuple(self.required_support_sources)
+        for source in required:
+            require_text(source, "required_support_source")
+        if len(set(required)) != len(required):
+            raise ValueError("required_support_sources must not contain duplicates")
+        if len(required) > self.min_supporting_sources:
+            raise ValueError(
+                "required_support_sources cannot exceed min_supporting_sources"
+            )
+        object.__setattr__(self, "required_support_sources", required)
 
 
 @runtime_checkable
@@ -64,6 +82,7 @@ def evaluate_hypotheses(
     rejection_threshold: float = 0.65,
     conflict_threshold: float = 0.65,
     observation_quality: Mapping[str, float] | None = None,
+    observation_sources: Mapping[str, str] | None = None,
 ) -> tuple[Hypothesis, ...]:
     """Aggregate auditable signals into immutable hypothesis snapshots."""
     require_timezone(evaluated_at, "evaluated_at")
@@ -74,6 +93,7 @@ def evaluate_hypotheses(
     if not 0.0 < conflict_threshold <= 1.0:
         raise ValueError("conflict_threshold must be in (0.0, 1.0]")
     quality_by_id = dict(observation_quality or {})
+    source_by_id = dict(observation_sources or {})
     for observation_id, quality in quality_by_id.items():
         require_text(observation_id, "observation_quality observation_id")
         if (
@@ -82,6 +102,9 @@ def evaluate_hypotheses(
             or not 0.0 <= quality <= 1.0
         ):
             raise ValueError("observation quality must be between 0.0 and 1.0")
+    for observation_id, source in source_by_id.items():
+        require_text(observation_id, "observation_sources observation_id")
+        require_text(source, "observation source")
 
     definition_ids = tuple(item.hypothesis_id for item in definitions)
     if not definitions:
@@ -119,6 +142,16 @@ def evaluate_hypotheses(
             1.0,
             sum(weight for _, weight in contradiction_signals),
         )
+        supporting_sources = {
+            source_by_id.get(signal.observation_id, signal.observation_id)
+            for signal, _ in support_signals
+        }
+        source_requirement_met = (
+            len(supporting_sources) >= definition.min_supporting_sources
+            and set(definition.required_support_sources).issubset(
+                supporting_sources
+            )
+        )
 
         if not related:
             status = HypothesisStatus.OPEN
@@ -129,7 +162,11 @@ def evaluate_hypotheses(
             status = HypothesisStatus.CONFLICTED
         elif contradiction_score >= rejection_threshold:
             status = HypothesisStatus.REJECTED
-        elif support_score >= support_threshold and contradiction_score < 0.25:
+        elif (
+            support_score >= support_threshold
+            and contradiction_score < 0.25
+            and source_requirement_met
+        ):
             status = HypothesisStatus.SUPPORTED
         else:
             status = HypothesisStatus.INCONCLUSIVE
@@ -161,6 +198,8 @@ def evaluate_hypotheses(
                 rationale=(
                     f"support_score={support_score:.2f}; "
                     f"contradiction_score={contradiction_score:.2f}; "
+                    f"supporting_sources={len(supporting_sources)}; "
+                    f"source_requirement_met={str(source_requirement_met).lower()}; "
                     f"quality_adjusted_signals={len(related)}"
                 ),
                 updated_at=evaluated_at,
@@ -194,6 +233,9 @@ class ConnectivityHypothesisPolicy:
             evaluated_at=evaluated_at,
             observation_quality={
                 item.observation_id: item.quality_factor for item in observations
+            },
+            observation_sources={
+                item.observation_id: item.source for item in observations
             },
         )
 
@@ -343,6 +385,9 @@ class ManufacturingSignalHypothesisPolicy:
             observation_quality={
                 item.observation_id: item.quality_factor for item in observations
             },
+            observation_sources={
+                item.observation_id: item.source for item in observations
+            },
         )
 
     @staticmethod
@@ -352,9 +397,25 @@ class ManufacturingSignalHypothesisPolicy:
         return (
             HypothesisDefinition(f"{prefix}-NETWORK", f"The network path for {asset} is unavailable."),
             HypothesisDefinition(f"{prefix}-TELEMETRY", f"The telemetry service for {asset} is unavailable."),
-            HypothesisDefinition(f"{prefix}-CONFIG", f"Configuration drift affects {asset}."),
+            HypothesisDefinition(
+                f"{prefix}-CONFIG",
+                f"Configuration drift affects {asset}.",
+                min_supporting_sources=2,
+                required_support_sources=(
+                    "simulated_alarm_historian",
+                    "simulated_configuration_store",
+                ),
+            ),
             HypothesisDefinition(f"{prefix}-MAINTENANCE", f"Planned maintenance explains the signal gap on {asset}."),
-            HypothesisDefinition(f"{prefix}-SENSOR", f"Sensor data on {asset} is stale."),
+            HypothesisDefinition(
+                f"{prefix}-SENSOR",
+                f"Sensor data on {asset} is stale.",
+                min_supporting_sources=2,
+                required_support_sources=(
+                    "simulated_alarm_historian",
+                    "simulated_sensor_monitor",
+                ),
+            ),
         )
 
     @classmethod

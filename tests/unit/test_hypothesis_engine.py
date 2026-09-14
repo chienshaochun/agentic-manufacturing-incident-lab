@@ -174,3 +174,76 @@ def test_zero_quality_signal_leaves_hypothesis_open() -> None:
 
     assert hypotheses[0].status is HypothesisStatus.OPEN
     assert hypotheses[0].observation_ids == ()
+
+
+def test_support_requires_independent_sources_declared_by_hypothesis() -> None:
+    definition = HypothesisDefinition(
+        "HYP-001",
+        "Sensor data is stale.",
+        min_supporting_sources=2,
+        required_support_sources=("alarm_historian", "sensor_monitor"),
+    )
+    signals = (
+        HypothesisSignal(
+            "HYP-001", "OBS-ALARM-1", HypothesisEffect.SUPPORTS, 0.5, "A"
+        ),
+        HypothesisSignal(
+            "HYP-001", "OBS-ALARM-2", HypothesisEffect.SUPPORTS, 0.5, "B"
+        ),
+    )
+    hypotheses = evaluate_hypotheses(
+        incident=_incident(),
+        definitions=(definition,),
+        signals=signals,
+        observation_sources={
+            "OBS-ALARM-1": "alarm_historian",
+            "OBS-ALARM-2": "alarm_historian",
+        },
+        evaluated_at=NOW,
+    )
+
+    assert hypotheses[0].status is HypothesisStatus.INCONCLUSIVE
+    assert "support_score=1.00" in hypotheses[0].rationale
+    assert "supporting_sources=1" in hypotheses[0].rationale
+    assert "source_requirement_met=false" in hypotheses[0].rationale
+
+
+def test_required_independent_sources_allow_supported_status() -> None:
+    definition = HypothesisDefinition(
+        "HYP-001",
+        "Sensor data is stale.",
+        min_supporting_sources=2,
+        required_support_sources=("alarm_historian", "sensor_monitor"),
+    )
+    signals = (
+        HypothesisSignal(
+            "HYP-001", "OBS-ALARM", HypothesisEffect.SUPPORTS, 0.3, "A"
+        ),
+        HypothesisSignal(
+            "HYP-001", "OBS-SENSOR", HypothesisEffect.SUPPORTS, 0.7, "B"
+        ),
+    )
+    hypotheses = evaluate_hypotheses(
+        incident=_incident(),
+        definitions=(definition,),
+        signals=signals,
+        observation_sources={
+            "OBS-ALARM": "alarm_historian",
+            "OBS-SENSOR": "sensor_monitor",
+        },
+        evaluated_at=NOW,
+    )
+
+    assert hypotheses[0].status is HypothesisStatus.SUPPORTED
+    assert "supporting_sources=2" in hypotheses[0].rationale
+    assert "source_requirement_met=true" in hypotheses[0].rationale
+
+
+@pytest.mark.parametrize("value", [0, -1, True, 1.5])
+def test_definition_requires_positive_supporting_source_count(value) -> None:
+    with pytest.raises(ValueError, match="min_supporting_sources"):
+        HypothesisDefinition(
+            "HYP-001",
+            "Candidate.",
+            min_supporting_sources=value,
+        )

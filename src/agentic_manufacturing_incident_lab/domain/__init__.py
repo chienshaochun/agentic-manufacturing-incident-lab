@@ -4,6 +4,12 @@ from agentic_manufacturing_incident_lab.domain.execution import (
     ActionResult,
     ActionResultStatus,
 )
+from agentic_manufacturing_incident_lab.domain.hypotheses import (
+    Hypothesis,
+    HypothesisEffect,
+    HypothesisSignal,
+    HypothesisStatus,
+)
 from agentic_manufacturing_incident_lab.domain.models import (
     Action,
     ActionRisk,
@@ -27,6 +33,10 @@ __all__ = [
     "ActionResultStatus",
     "ActionRisk",
     "Evidence",
+    "Hypothesis",
+    "HypothesisEffect",
+    "HypothesisSignal",
+    "HypothesisStatus",
     "Incident",
     "IncidentSeverity",
     "Observation",

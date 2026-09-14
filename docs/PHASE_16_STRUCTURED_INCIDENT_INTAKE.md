@@ -72,6 +72,20 @@ parse(raw_text, known_asset_ids) -> IncidentIntake
 
 確認後的文字會附加到真正送入 Coordinator 的 Incident description，並保存在中文 Raw Trace 中。它已不再只是頁面上的裝飾文字。
 
+## 結果頁的資訊層級
+
+完整調查資料仍全部保留，但不再同時攤在預設畫面。精簡展示只顯示：
+
+- 工作流、工具呼叫、Evidence 數量與安全審查四個核心指標；
+- 最終結論或安全停止理由；
+- 一步一列的關鍵 Tool 與 Observation；
+- 最終候選原因及支持／反對數量；
+- 已成立的 Evidence。
+
+Hypothesis 演化和 Planner 選擇理由收在展開區。需要除錯或面試深入追問時，可開啟「完整稽核模式」，再顯示全部 12 個指標、六個稽核分頁、Handoff、Attempt、完整候選 Utility 與 Raw Trace。
+
+這是資訊的漸進式揭露：刪除的是預設畫面的噪音，不是可稽核資料。
+
 ## 執行與測試重點
 
 測試涵蓋：

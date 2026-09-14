@@ -57,7 +57,7 @@ def test_app_loads_incident_workbench_without_running_case() -> None:
     assert any(expander.label == "技術與稽核資料（JSON）" for expander in app.expander)
     assert any("請選擇症狀與模擬批次" in info.value for info in app.info)
     assert any("answer key 在調查期間對 Agent 隱藏" in caption.value for caption in app.caption)
-    assert any("介面版本：Editable Incident Intake v1" in caption.value for caption in app.caption)
+    assert any("介面版本：Progressive Disclosure UI v1" in caption.value for caption in app.caption)
 
 
 def test_run_button_executes_default_case_and_displays_metrics() -> None:
@@ -66,17 +66,15 @@ def test_run_button_executes_default_case_and_displays_metrics() -> None:
     app.button[0].click().run()
 
     assert not app.exception
-    assert any(metric.label == "工作流 Workflow" for metric in app.metric)
+    assert any(metric.label == "工作流" for metric in app.metric)
     assert any(metric.value == "completed" for metric in app.metric)
-    assert any(metric.label == "基準結果 Benchmark" for metric in app.metric)
-    assert any(metric.value == "PASS" for metric in app.metric)
+    assert any(metric.label == "安全審查" and metric.value == "approved" for metric in app.metric)
     assert any("調查完成" in success.value for success in app.success)
-    assert len(app.get("tab")) == 6
-    assert len(app.dataframe) == 7
-    assert any("每取得一筆新 Observation" in caption.value for caption in app.caption)
-    assert len(app.dataframe[1].value) == 4
-    assert any("Utility = Information" in caption.value for caption in app.caption)
-    assert any("Planner 候選決策" in code.value for code in app.code)
+    assert len(app.get("tab")) == 0
+    assert app.toggle[0].value is False
+    assert any("目前為精簡展示" in caption.value for caption in app.caption)
+    assert any(markdown.value == "#### 關鍵檢查" for markdown in app.markdown)
+    assert any(markdown.value == "#### 最終候選原因" for markdown in app.markdown)
 
 
 def test_operator_can_edit_intake_before_confirming_and_running() -> None:
@@ -89,6 +87,7 @@ def test_operator_can_edit_intake_before_confirming_and_running() -> None:
     app.selectbox[3].set_value("沒有更新").run()
     app.selectbox[4].set_value("其他設備正常").run()
     app.button[0].click().run()
+    app.toggle[0].set_value(True).run()
 
     trace = next(code.value for code in app.code if "Benchmark 稽核軌跡" in code.value)
     assert note in trace
@@ -110,6 +109,7 @@ def test_operator_can_edit_intake_before_confirming_and_running() -> None:
 def test_case_download_buttons_serve_chinese_markdown_and_trace() -> None:
     app = load_app()
     app.button[0].click().run()
+    app.toggle[0].set_value(True).run()
     view = _default_case_view()
     report = case_report_markdown(view)
     displayed_trace = next(
@@ -154,9 +154,12 @@ def test_uncertain_symptom_batch_safe_stops_without_report() -> None:
 
     assert not app.exception
     assert any("安全停止" in info.value for info in app.info)
-    assert any("Safety outcome：requires_attention" in warning.value for warning in app.warning)
-    assert any("沒有產生正式報告" in info.value for info in app.info)
-    assert any("設定資料品質不足" not in caption.value for caption in app.caption)
+    assert any(
+        metric.label == "安全審查" and metric.value == "requires_attention"
+        for metric in app.metric
+    )
+    assert any("未產生正式結論" in warning.value for warning in app.warning)
+    assert any("目前沒有足以成立的 Evidence" in info.value for info in app.info)
 
 
 def test_benchmark_dashboard_runs_all_controlled_cases() -> None:

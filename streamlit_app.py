@@ -93,7 +93,7 @@ SIMULATION_BATCH_LABELS = {
 WORKBENCH_PAGE = "事件調查台 Incident Workbench"
 BENCHMARK_PAGE = "基準測試 Benchmark Dashboard"
 ABOUT_PAGE = "關於專案 About"
-APP_RELEASE = "Editable Incident Intake v1"
+APP_RELEASE = "Progressive Disclosure UI v1"
 
 NETWORK_STATUS_OPTIONS = {
     "未知／尚未檢查": None,
@@ -218,7 +218,7 @@ def _hypothesis_evolution_rows(view: CasePresentation) -> list[dict[str, object]
     return list(rows_by_step.values())
 
 
-def _render_case_details(view: CasePresentation) -> None:
+def _render_full_case_details(view: CasePresentation) -> None:
     st.subheader("調查總覽 Investigation overview")
     _metric_grid(view.metrics)
     _render_case_status(view)
@@ -420,6 +420,10 @@ def _render_case_details(view: CasePresentation) -> None:
         st.markdown("#### 完整且可重播的稽核軌跡")
         st.code(view.trace_text, language="text", line_numbers=True)
 
+    _render_downloads(view)
+
+
+def _render_downloads(view: CasePresentation) -> None:
     st.subheader("下載調查產物 Download artifacts")
     report_column, json_column, trace_column = st.columns(3)
     report_column.download_button(
@@ -446,6 +450,104 @@ def _render_case_details(view: CasePresentation) -> None:
         on_click="ignore",
         width="stretch",
     )
+
+
+def _compact_action_rows(view: CasePresentation) -> list[dict[str, object]]:
+    rows: dict[int, dict[str, object]] = {}
+    for attempt in view.action_attempts:
+        row = rows.setdefault(
+            attempt.action_sequence,
+            {
+                "步驟": attempt.action_sequence,
+                "檢查工具": attempt.tool,
+                "檢查目的": attempt.rationale.split(" Utility=", 1)[0],
+                "Observation": "尚未取得觀察結果",
+            },
+        )
+        if attempt.observations:
+            row["Observation"] = attempt.observations.split(" values=", 1)[0]
+    return list(rows.values())
+
+
+def _compact_hypothesis_rows(view: CasePresentation) -> list[dict[str, object]]:
+    return [
+        {
+            "候選原因": hypothesis.statement,
+            "狀態": HYPOTHESIS_STATUS_LABELS[hypothesis.status],
+            "支持／反對": (
+                f"支持 {len(hypothesis.supporting_observation_ids.split(', ')) if hypothesis.supporting_observation_ids else 0}｜"
+                f"反對 {len(hypothesis.contradicting_observation_ids.split(', ')) if hypothesis.contradicting_observation_ids else 0}"
+            ),
+        }
+        for hypothesis in view.hypotheses
+    ]
+
+
+def _render_compact_case_details(view: CasePresentation) -> None:
+    st.subheader("調查結果")
+    columns = st.columns(4)
+    columns[0].metric("工作流", view.workflow_status, border=True)
+    columns[1].metric("工具呼叫", str(len(_compact_action_rows(view))), border=True)
+    columns[2].metric("Evidence", str(len(view.evidence)), border=True)
+    columns[3].metric(
+        "安全審查",
+        view.safety.outcome if view.safety is not None else "none",
+        border=True,
+    )
+    _render_case_status(view)
+
+    st.markdown("#### 結論")
+    if view.report is not None:
+        st.success(view.report.conclusion)
+    elif view.safety is not None:
+        st.warning(f"未產生正式結論：{view.safety.rationale}")
+    else:
+        st.warning("本次執行沒有足夠產物形成結論。")
+
+    st.markdown("#### 關鍵檢查")
+    action_rows = _compact_action_rows(view)
+    if action_rows:
+        st.dataframe(action_rows, hide_index=True, width="stretch")
+    else:
+        st.info("沒有可顯示的診斷檢查。")
+
+    st.markdown("#### 最終候選原因")
+    if view.hypotheses:
+        st.dataframe(
+            _compact_hypothesis_rows(view),
+            hide_index=True,
+            width="stretch",
+        )
+    else:
+        st.info("沒有可顯示的診斷假設。")
+
+    st.markdown("#### Evidence")
+    if view.evidence:
+        for evidence in view.evidence:
+            st.markdown(f"- {evidence.claim}（信心值 {evidence.confidence:.2f}）")
+    else:
+        st.info("目前沒有足以成立的 Evidence claim。")
+
+    with st.expander("查看 Hypothesis 演化"):
+        st.caption("每筆 Observation 如何改變所有候選原因。")
+        st.dataframe(
+            _hypothesis_evolution_rows(view),
+            hide_index=True,
+            width="stretch",
+        )
+
+    with st.expander("查看 Planner 選擇理由"):
+        selected_candidates = [
+            asdict(candidate)
+            for candidate in view.planner_candidates
+            if candidate.selected
+        ]
+        if selected_candidates:
+            st.dataframe(selected_candidates, hide_index=True, width="stretch")
+        else:
+            st.info("沒有可顯示的 Planner 候選評分。")
+
+    _render_downloads(view)
 
 
 def _incident_workbench() -> None:
@@ -532,10 +634,6 @@ def _incident_workbench() -> None:
         telemetry_available=TELEMETRY_STATUS_OPTIONS[telemetry_status],
         peer_affected=PEER_STATUS_OPTIONS[peer_status],
     )
-    st.info(
-        f"確認摘要：設備 {intake.asset_id}｜症狀 {selected_symptom}｜"
-        f"描述：{intake.raw_text}"
-    )
     with st.expander("技術與稽核資料（JSON）"):
         st.caption(
             "這是系統交換格式，不需要工程師直接修改。未來 Ollama 也必須通過相同 Schema。"
@@ -560,7 +658,18 @@ def _incident_workbench() -> None:
     if result is None:
         st.info("請選擇症狀與模擬批次並執行調查，畫面才會顯示該次結果。")
         return
-    _render_case_details(build_case_presentation(result))
+    st.divider()
+    full_audit = st.toggle(
+        "顯示完整稽核模式",
+        value=False,
+        help="開啟後顯示全部 12 個指標、Handoff、Attempt、Utility 與 Raw Trace。",
+    )
+    view = build_case_presentation(result)
+    if full_audit:
+        _render_full_case_details(view)
+    else:
+        st.caption("目前為精簡展示；技術細節可由上方切換至完整稽核模式。")
+        _render_compact_case_details(view)
 
 
 def _benchmark_dashboard() -> None:

@@ -20,11 +20,11 @@ def result_by_id(summary: BenchmarkSummary, case_id: str) -> BenchmarkCaseResult
     return next(result for result in summary.results if result.case_id == case_id)
 
 
-def test_default_controlled_benchmark_passes_all_eight_cases() -> None:
+def test_default_controlled_benchmark_passes_all_eleven_cases() -> None:
     summary = run_controlled_benchmark()
 
-    assert summary.case_count == 8
-    assert summary.passed_count == 8
+    assert summary.case_count == 11
+    assert summary.passed_count == 11
     assert summary.failed_count == 0
     assert summary.pass_rate == 1.0
     assert summary.all_passed is True
@@ -36,8 +36,8 @@ def test_summary_reports_evidence_and_resource_aggregates() -> None:
 
     assert summary.mean_evidence_precision == 1.0
     assert summary.mean_evidence_recall == 1.0
-    assert summary.total_tool_calls == 26
-    assert summary.total_handoffs == 42
+    assert summary.total_tool_calls == 44
+    assert summary.total_handoffs == 54
 
 
 def test_completed_case_has_exact_correctness_and_cost_metrics() -> None:

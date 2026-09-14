@@ -5,6 +5,7 @@ import pytest
 from agentic_manufacturing_incident_lab.simulation import (
     AssetRole,
     ScenarioDefinition,
+    SourceQualityProfile,
     build_station_connectivity_scenario,
 )
 
@@ -78,3 +79,23 @@ def test_unknown_asset_truth_lookup_fails_explicitly() -> None:
 
     with pytest.raises(KeyError, match="unknown asset_id: ST-99"):
         scenario.asset_truth("ST-99")
+
+
+def test_scenario_rejects_duplicate_source_quality_profiles() -> None:
+    scenario = build_station_connectivity_scenario(seed=43)
+    profile = SourceQualityProfile(source="simulated_connectivity_sensor")
+
+    with pytest.raises(ValueError, match="unique sources"):
+        replace(scenario, source_quality_profiles=(profile, profile))
+
+
+@pytest.mark.parametrize("field_name", ["source_reliability", "measurement_quality", "freshness"])
+@pytest.mark.parametrize("invalid_value", [-0.01, 1.01, True])
+def test_source_quality_profile_rejects_invalid_scores(
+    field_name: str,
+    invalid_value: object,
+) -> None:
+    values = {field_name: invalid_value}
+
+    with pytest.raises(ValueError, match=f"{field_name} must be between 0.0 and 1.0"):
+        SourceQualityProfile(source="sensor", **values)  # type: ignore[arg-type]

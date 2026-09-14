@@ -18,10 +18,10 @@ def test_summary_renders_all_cases_and_aggregate_metrics() -> None:
     assert "isolated-station-seed-42" in rendered
     assert "diagnostic-exception-seed-43" in rendered
     assert "contradictory-approval-seed-43" in rendered
-    assert "- cases: 13" in rendered
-    assert "- passed: 13" in rendered
-    assert "- physical tool calls: 33" in rendered
-    assert "- coordination handoffs: 56" in rendered
+    assert "- cases: 16" in rendered
+    assert "- passed: 16" in rendered
+    assert "- physical tool calls: 51" in rendered
+    assert "- coordination handoffs: 68" in rendered
     assert "- all passed: yes" in rendered
 
 

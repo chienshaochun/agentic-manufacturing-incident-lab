@@ -32,6 +32,9 @@ CASE_LABELS = {
     "action-budget-safe-stop-seed-43": "動作額度耗盡｜Action budget safe stop",
     "sensor-staleness-seed-117": "製程訊號平線：感測器資料過期｜Sensor staleness",
     "configuration-drift-seed-118": "製程訊號平線：設定版本漂移｜Configuration drift",
+    "conflicting-sensor-evidence-seed-119": "製程訊號平線：感測資料矛盾｜Conflicting evidence",
+    "low-quality-configuration-evidence-seed-120": "製程訊號平線：設定資料品質不足｜Low-quality evidence",
+    "multiple-supported-causes-seed-121": "製程訊號平線：同時支持多個原因｜Multiple causes",
     "diagnostic-exception-seed-43": "診斷 Agent 例外｜Diagnostic exception",
     "diagnostic-invalid-response-seed-43": "診斷回覆無效｜Invalid response",
     "safety-reviewer-exception-seed-43": "安全審查 Agent 例外｜Reviewer exception",
@@ -330,7 +333,7 @@ def _benchmark_dashboard() -> None:
 
     view = _current_benchmark_view()
     if view is None:
-        st.info("執行 Benchmark 後，即可比較全部 13 個受控案例。")
+        st.info("執行 Benchmark 後，即可比較全部 16 個受控案例。")
         return
 
     _metric_grid(view.metrics)

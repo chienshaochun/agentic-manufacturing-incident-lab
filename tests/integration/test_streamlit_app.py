@@ -126,13 +126,13 @@ def test_benchmark_dashboard_runs_all_controlled_cases() -> None:
     app.button[0].click().run(timeout=60)
 
     assert not app.exception
-    assert any(metric.label == "案例數 Cases" and metric.value == "13" for metric in app.metric)
-    assert any(metric.label == "通過 Passed" and metric.value == "13" for metric in app.metric)
+    assert any(metric.label == "案例數 Cases" and metric.value == "16" for metric in app.metric)
+    assert any(metric.label == "通過 Passed" and metric.value == "16" for metric in app.metric)
     assert len(app.dataframe) == 2
-    assert len(app.dataframe[0].value) == 13
+    assert len(app.dataframe[0].value) == 16
     assert len(app.dataframe[1].value) == 5
     assert any("所有案例" in success.value for success in app.success)
-    assert any("- 案例數： 13" in code.value for code in app.code)
+    assert any("- 案例數： 16" in code.value for code in app.code)
 
 
 def test_about_page_explains_guarded_optional_llm_boundary() -> None:

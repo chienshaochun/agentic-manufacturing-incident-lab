@@ -141,6 +141,7 @@ class SimulatedEnvironment:
     ) -> Observation:
         self._observation_count += 1
         sequence = self._observation_count
+        quality = self._scenario.quality_for_source(source)
         return Observation(
             observation_id=f"{self._scenario.incident.incident_id}-OBS-{sequence:03d}",
             incident_id=self._scenario.incident.incident_id,
@@ -149,4 +150,7 @@ class SimulatedEnvironment:
             summary=summary,
             observed_at=self.current_time,
             values=values,
+            source_reliability=quality.source_reliability,
+            measurement_quality=quality.measurement_quality,
+            freshness=quality.freshness,
         )

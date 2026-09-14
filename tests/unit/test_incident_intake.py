@@ -120,6 +120,24 @@ def test_manual_fallback_uses_same_contract_without_claiming_nlp() -> None:
     assert intake.network_reachable is None
 
 
+def test_manual_intake_preserves_operator_edited_fields() -> None:
+    intake = build_manual_intake(
+        raw_text="ST-02 ping 正常，但數值三十分鐘沒有更新。",
+        asset_id="ST-02",
+        symptom_type=SymptomType.TELEMETRY_MISSING,
+        known_asset_ids=KNOWN_ASSETS,
+        duration_minutes=30,
+        network_reachable=True,
+        telemetry_available=False,
+        peer_affected=False,
+    )
+
+    assert intake.duration_minutes == 30
+    assert intake.network_reachable is True
+    assert intake.telemetry_available is False
+    assert intake.peer_affected is False
+
+
 def test_confirmed_intake_records_explicit_human_gate() -> None:
     intake = build_manual_intake(
         raw_text="ST-01 無法連線",

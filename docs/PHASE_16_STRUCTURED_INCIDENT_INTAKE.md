@@ -64,9 +64,11 @@ parse(raw_text, known_asset_ids) -> IncidentIntake
 
 目前使用 `manual_structured_input_v1`：症狀與設備來自操作員選擇，不宣稱自由文字已被模型理解。這個 fallback 與未來 Ollama 共用相同 `IncidentIntake` 型別。
 
-## 人工確認閘門
+## 可編輯確認表單與人工閘門
 
-UI 會先顯示結構化 JSON。操作員勾選確認後，Run 按鈕才會啟用。症狀、批次或文字改變時，確認 fingerprint 也會改變，因此必須重新確認。
+主畫面不要求工程師閱讀或編輯 JSON，而是提供中文表單，讓操作員修改異常描述、持續時間、網路狀態、Telemetry 狀態與其他設備狀態。未知資訊可以保持「尚未檢查」，不會被偽裝成確定值。
+
+原始 JSON 收在「技術與稽核資料」展開區，只供系統整合與除錯。按下「確認並執行調查」本身就是明確的人工確認動作，因此不再要求使用者重複勾選 checkbox。
 
 確認後的文字會附加到真正送入 Coordinator 的 Incident description，並保存在中文 Raw Trace 中。它已不再只是頁面上的裝飾文字。
 
@@ -78,8 +80,9 @@ UI 會先顯示結構化 JSON。操作員勾選確認後，Run 按鈕才會啟�
 - Root Cause 不能冒充症狀代碼；
 - 未知設備、負時間、字串布林值與超界 confidence 都會被拒絕；
 - Manual fallback 與未來 Ollama 使用相同契約；
-- 未確認時 Run 按鈕停用；
-- 操作員文字確實寫入 Incident 與 Raw Trace；
+- 描述、持續時間及三種設備狀態可以由操作員修改；
+- 單一按鈕同時建立確認紀錄並啟動調查；
+- 操作員確認的全部欄位確實寫入 Incident 與 Raw Trace；
 - 四種症狀及其可重播批次可正常路由。
 
 ## 尚未完成的限制

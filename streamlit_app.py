@@ -93,7 +93,7 @@ SIMULATION_BATCH_LABELS = {
 WORKBENCH_PAGE = "事件調查台 Incident Workbench"
 BENCHMARK_PAGE = "基準測試 Benchmark Dashboard"
 ABOUT_PAGE = "關於專案 About"
-APP_RELEASE = "Structured Incident Intake v1"
+APP_RELEASE = "Editable Incident Intake v1"
 
 NETWORK_STATUS_OPTIONS = {
     "未知／尚未檢查": None,

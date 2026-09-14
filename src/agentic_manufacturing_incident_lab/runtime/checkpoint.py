@@ -34,6 +34,10 @@ from agentic_manufacturing_incident_lab.domain.models import (
     ObservationKind,
     ScalarValue,
 )
+from agentic_manufacturing_incident_lab.domain.hypotheses import (
+    Hypothesis,
+    HypothesisStatus,
+)
 from agentic_manufacturing_incident_lab.domain.task import TaskState, TaskStatus
 from agentic_manufacturing_incident_lab.runtime.executor import (
     ActionExecutionRecord,
@@ -52,7 +56,7 @@ from agentic_manufacturing_incident_lab.safety import (
     SafetyDisposition,
 )
 
-CHECKPOINT_SCHEMA_VERSION = 3
+CHECKPOINT_SCHEMA_VERSION = 4
 CHECKPOINT_KIND = "agentic_manufacturing_investigation"
 
 
@@ -180,6 +184,7 @@ def _encode_run(run: InvestigationRun) -> dict[str, Any]:
             _encode_approval_request(item) for item in run.approval_requests
         ],
         "evidence": [_encode_evidence(item) for item in run.evidence],
+        "hypotheses": [_encode_hypothesis(item) for item in run.hypotheses],
         "executions": [_encode_execution(record) for record in run.executions],
         "incident": _encode_incident(run.incident),
         "memory_states": [
@@ -329,6 +334,24 @@ def _encode_evidence(evidence: Evidence) -> dict[str, Any]:
     }
 
 
+def _encode_hypothesis(hypothesis: Hypothesis) -> dict[str, Any]:
+    return {
+        "confidence": hypothesis.confidence,
+        "contradicting_observation_ids": list(
+            hypothesis.contradicting_observation_ids
+        ),
+        "hypothesis_id": hypothesis.hypothesis_id,
+        "incident_id": hypothesis.incident_id,
+        "rationale": hypothesis.rationale,
+        "statement": hypothesis.statement,
+        "status": hypothesis.status.value,
+        "supporting_observation_ids": list(
+            hypothesis.supporting_observation_ids
+        ),
+        "updated_at": hypothesis.updated_at.isoformat(),
+    }
+
+
 def _encode_working_memory(memory: WorkingMemory) -> dict[str, Any]:
     return {
         "facts": [
@@ -369,6 +392,7 @@ def _decode_run(data: dict[str, Any]) -> InvestigationRun:
             "approval_requests",
             "evidence",
             "executions",
+            "hypotheses",
             "incident",
             "memory_states",
             "recovery_assessments",
@@ -390,6 +414,10 @@ def _decode_run(data: dict[str, Any]) -> InvestigationRun:
         evidence=tuple(
             _decode_evidence(_require_object(item, "evidence"))
             for item in _require_list(data["evidence"], "evidence")
+        ),
+        hypotheses=tuple(
+            _decode_hypothesis(_require_object(item, "hypothesis"))
+            for item in _require_list(data["hypotheses"], "hypotheses")
         ),
         memory_states=tuple(
             _decode_working_memory(_require_object(item, "working_memory"))
@@ -720,6 +748,44 @@ def _decode_evidence(data: dict[str, Any]) -> Evidence:
         ),
         confidence=float(confidence),
         created_at=_decode_datetime(data["created_at"], "created_at"),
+    )
+
+
+def _decode_hypothesis(data: dict[str, Any]) -> Hypothesis:
+    _require_exact_keys(
+        data,
+        {
+            "confidence",
+            "contradicting_observation_ids",
+            "hypothesis_id",
+            "incident_id",
+            "rationale",
+            "statement",
+            "status",
+            "supporting_observation_ids",
+            "updated_at",
+        },
+        "hypothesis",
+    )
+    confidence = data["confidence"]
+    if type(confidence) not in (int, float) or not math.isfinite(confidence):
+        raise CheckpointError("hypothesis confidence must be a finite number")
+    return Hypothesis(
+        hypothesis_id=_require_string(data["hypothesis_id"], "hypothesis_id"),
+        incident_id=_require_string(data["incident_id"], "incident_id"),
+        statement=_require_string(data["statement"], "statement"),
+        status=_decode_enum(HypothesisStatus, data["status"], "hypothesis status"),
+        confidence=float(confidence),
+        supporting_observation_ids=_decode_string_tuple(
+            data["supporting_observation_ids"],
+            "supporting_observation_ids",
+        ),
+        contradicting_observation_ids=_decode_string_tuple(
+            data["contradicting_observation_ids"],
+            "contradicting_observation_ids",
+        ),
+        rationale=_require_string(data["rationale"], "rationale"),
+        updated_at=_decode_datetime(data["updated_at"], "updated_at"),
     )
 
 

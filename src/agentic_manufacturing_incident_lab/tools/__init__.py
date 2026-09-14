@@ -17,8 +17,12 @@ from agentic_manufacturing_incident_lab.tools.faults import (
     InjectedFault,
 )
 from agentic_manufacturing_incident_lab.tools.diagnostics import (
+    AlarmHistoryTool,
+    ConfigurationTool,
     ConnectivityTool,
     IncidentScopeError,
+    MaintenanceRecordTool,
+    SensorFreshnessTool,
     TelemetryTool,
 )
 from agentic_manufacturing_incident_lab.tools.registry import (
@@ -27,13 +31,19 @@ from agentic_manufacturing_incident_lab.tools.registry import (
     ToolRiskMismatchError,
     UnknownToolError,
 )
-from agentic_manufacturing_incident_lab.tools.catalog import build_diagnostic_registry
+from agentic_manufacturing_incident_lab.tools.catalog import (
+    build_diagnostic_registry,
+    build_manufacturing_diagnostic_registry,
+)
 
 __all__ = [
+    "AlarmHistoryTool",
+    "ConfigurationTool",
     "ConnectivityTool",
     "DuplicateToolError",
     "FaultInjectingTool",
     "IncidentScopeError",
+    "MaintenanceRecordTool",
     "InjectedFault",
     "PermanentToolError",
     "Tool",
@@ -50,4 +60,6 @@ __all__ = [
     "TransientToolError",
     "UnknownToolError",
     "build_diagnostic_registry",
+    "build_manufacturing_diagnostic_registry",
+    "SensorFreshnessTool",
 ]

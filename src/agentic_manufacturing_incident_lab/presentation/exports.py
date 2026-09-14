@@ -43,9 +43,27 @@ def case_report_markdown(view: CasePresentation) -> str:
         f"- 診斷狀態：`{view.diagnostic_status}`",
         f"- 驗收結果：`{'PASS' if view.passed else 'FAIL'}`",
         "",
-        "## 證據 Evidence",
+        "## 診斷假設 Hypotheses",
         "",
     ]
+    if view.hypotheses:
+        for hypothesis in view.hypotheses:
+            lines.extend(
+                (
+                    f"- **{hypothesis.hypothesis_id}** — {hypothesis.statement}",
+                    f"  - 狀態：`{hypothesis.status}`；信心值：`{hypothesis.confidence:.2f}`",
+                    f"  - 支持的 Observations：{hypothesis.supporting_observation_ids or '無'}",
+                    f"  - 反對的 Observations：{hypothesis.contradicting_observation_ids or '無'}",
+                )
+            )
+    else:
+        lines.append("本次執行沒有建立診斷假設。")
+
+    lines.extend((
+        "",
+        "## 證據 Evidence",
+        "",
+    ))
     if view.evidence:
         for evidence in view.evidence:
             lines.extend(

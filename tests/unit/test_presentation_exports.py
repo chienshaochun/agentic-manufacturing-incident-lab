@@ -31,6 +31,8 @@ def test_case_json_contains_grounded_nested_products() -> None:
     assert document["case_id"] == "isolated-station-seed-43"
     assert document["safety"]["outcome"] == "approved"
     assert document["report"]["evidence_ids"]
+    assert len(document["hypotheses"]) == 3
+    assert document["hypotheses"][0]["status"] == "supported"
     assert len(document["handoffs"]) == 6
 
 
@@ -41,6 +43,8 @@ def test_case_report_markdown_handles_completed_and_missing_report() -> None:
 
     assert "# 事件調查報告：INC-CONNECTIVITY-0043" in completed
     assert "## 證據 Evidence" in completed
+    assert "## 診斷假設 Hypotheses" in completed
+    assert "支持的 Observations" in completed
     assert "**結論：**" in completed
     assert "本次執行沒有產生正式報告" in contained
 
@@ -50,14 +54,17 @@ def test_benchmark_exports_have_all_cases_and_stable_columns() -> None:
     document = json.loads(benchmark_json(view))
     rows = list(csv.DictReader(StringIO(benchmark_csv(view))))
 
-    assert len(document["rows"]) == 11
-    assert len(rows) == 11
+    assert len(document["rows"]) == 13
+    assert len(rows) == 13
     assert tuple(rows[0]) == (
         "case",
         "workflow",
         "diagnostic",
         "precision",
         "recall",
+        "hypothesis_resolution",
+        "unsupported_claim_rate",
+        "redundant_tool_rate",
         "tool_calls",
         "handoffs",
         "failure",

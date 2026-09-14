@@ -6,9 +6,10 @@ import streamlit as st
 
 from agentic_manufacturing_incident_lab.evaluation import (
     BenchmarkCaseResult,
-    build_phase7_benchmark_catalog,
+    build_benchmark_catalog,
     run_benchmark_case,
-    run_phase7_benchmark,
+    run_benchmark,
+    run_planner_comparison,
 )
 from agentic_manufacturing_incident_lab.presentation import (
     BenchmarkPresentation,
@@ -29,6 +30,8 @@ CASE_LABELS = {
     "shared-infrastructure-seed-73": "共用基礎設施疑點｜Shared infrastructure",
     "telemetry-path-seed-91": "遙測路徑疑點｜Telemetry path",
     "action-budget-safe-stop-seed-43": "動作額度耗盡｜Action budget safe stop",
+    "sensor-staleness-seed-117": "製程訊號平線：感測器資料過期｜Sensor staleness",
+    "configuration-drift-seed-118": "製程訊號平線：設定版本漂移｜Configuration drift",
     "diagnostic-exception-seed-43": "診斷 Agent 例外｜Diagnostic exception",
     "diagnostic-invalid-response-seed-43": "診斷回覆無效｜Invalid response",
     "safety-reviewer-exception-seed-43": "安全審查 Agent 例外｜Reviewer exception",
@@ -39,7 +42,7 @@ CASE_LABELS = {
 WORKBENCH_PAGE = "事件調查台 Incident Workbench"
 BENCHMARK_PAGE = "基準測試 Benchmark Dashboard"
 ABOUT_PAGE = "關於專案 About"
-APP_RELEASE = "中文調查產物 v1"
+APP_RELEASE = "Agent Evaluation & Planner A/B v1"
 
 
 def _metric_grid(metrics) -> None:
@@ -54,7 +57,7 @@ def _metric_grid(metrics) -> None:
 
 
 def _case_lookup():
-    return {case.case_id: case for case in build_phase7_benchmark_catalog()}
+    return {case.case_id: case for case in build_benchmark_catalog()}
 
 
 def _run_selected_case(case_id: str) -> None:
@@ -73,8 +76,9 @@ def _current_case_result(case_id: str) -> BenchmarkCaseResult | None:
 
 def _run_full_benchmark() -> None:
     with st.spinner("Running all controlled benchmark cases..."):
-        summary = run_phase7_benchmark()
+        summary = run_benchmark()
     st.session_state["benchmark_view"] = build_benchmark_presentation(summary)
+    st.session_state["planner_comparison"] = run_planner_comparison()
 
 
 def _current_benchmark_view() -> BenchmarkPresentation | None:
@@ -97,9 +101,10 @@ def _render_case_details(view: CasePresentation) -> None:
     st.subheader("調查總覽 Investigation overview")
     _metric_grid(view.metrics)
     _render_case_status(view)
-    handoff_tab, action_tab, evidence_tab, outcome_tab, trace_tab = st.tabs(
+    handoff_tab, hypothesis_tab, action_tab, evidence_tab, outcome_tab, trace_tab = st.tabs(
         (
             "交接紀錄 Handoffs",
+            "診斷假設 Hypotheses",
             "動作與嘗試 Actions & attempts",
             "證據與安全 Evidence & safety",
             "報告與失敗 Report & failures",
@@ -124,9 +129,37 @@ def _render_case_details(view: CasePresentation) -> None:
             },
         )
 
+    with hypothesis_tab:
+        st.markdown("#### 競爭中的故障假設")
+        st.caption(
+            "每個候選原因都分別累積支持與反對它的 Observation；"
+            "Hypothesis 不是正式 Evidence，也不等同已確認 Root Cause。"
+        )
+        if view.hypotheses:
+            st.dataframe(
+                [asdict(hypothesis) for hypothesis in view.hypotheses],
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "hypothesis_id": "Hypothesis ID",
+                    "statement": "候選原因",
+                    "status": "狀態",
+                    "confidence": "信心值",
+                    "supporting_observation_ids": "支持的 Observations",
+                    "contradicting_observation_ids": "反對的 Observations",
+                    "rationale": "評分摘要",
+                },
+            )
+        else:
+            st.info("Diagnostic Agent 沒有產生可顯示的診斷假設。")
+
     with action_tab:
         st.markdown("#### 診斷動作與實際嘗試")
         st.caption("一個邏輯 Action 在重試時，可能包含多個實際 Attempt。")
+        st.caption(
+            "Hypothesis-driven Planner會在Action理由中記錄Utility、"
+            "未解假設涵蓋率、風險與成本。"
+        )
         if view.action_attempts:
             st.dataframe(
                 [asdict(attempt) for attempt in view.action_attempts],
@@ -297,7 +330,7 @@ def _benchmark_dashboard() -> None:
 
     view = _current_benchmark_view()
     if view is None:
-        st.info("執行 Benchmark 後，即可比較全部 11 個受控案例。")
+        st.info("執行 Benchmark 後，即可比較全部 13 個受控案例。")
         return
 
     _metric_grid(view.metrics)
@@ -318,10 +351,34 @@ def _benchmark_dashboard() -> None:
             "diagnostic": "診斷狀態",
             "precision": "Evidence precision",
             "recall": "Evidence recall",
+            "hypothesis_resolution": "假設解析率",
+            "unsupported_claim_rate": "無根據主張率",
+            "redundant_tool_rate": "重複工具率",
             "tool_calls": "實際工具呼叫",
             "handoffs": "Agent 交接",
             "failure": "故障類型",
             "passed": "是否通過",
+        },
+    )
+    st.subheader("Planner A/B 比較")
+    st.caption(
+        "在相同 Scenario 與 seed 下隔離執行 rule-based 與 hypothesis-driven Planner；"
+        "確認動作成本與結果一致，同時顯示假設解析程度。"
+    )
+    st.dataframe(
+        [asdict(row) for row in st.session_state["planner_comparison"]],
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "case": "案例 Case",
+            "rule_status": "Rule 狀態",
+            "hypothesis_status": "Hypothesis 狀態",
+            "rule_actions": "Rule Actions",
+            "hypothesis_actions": "Hypothesis Actions",
+            "action_delta": "Action 差值",
+            "same_tool_sequence": "工具順序相同",
+            "same_evidence": "Evidence 相同",
+            "hypothesis_resolution": "假設解析率",
         },
     )
     with st.expander("彙總文字 Aggregate summary"):
@@ -332,7 +389,7 @@ def _benchmark_dashboard() -> None:
     json_column.download_button(
         "下載完整 Benchmark (.json)",
         data=benchmark_json(view),
-        file_name="phase-7-benchmark.json",
+        file_name="agent-evaluation-benchmark.json",
         mime="application/json",
         on_click="ignore",
         width="stretch",
@@ -340,7 +397,7 @@ def _benchmark_dashboard() -> None:
     csv_column.download_button(
         "下載案例表格 (.csv)",
         data=benchmark_csv(view),
-        file_name="phase-7-benchmark.csv",
+        file_name="agent-evaluation-benchmark.csv",
         mime="text/csv",
         on_click="ignore",
         width="stretch",
@@ -348,7 +405,7 @@ def _benchmark_dashboard() -> None:
     text_column.download_button(
         "下載彙總結果 (.txt)",
         data=view.summary_text,
-        file_name="phase-7-benchmark.txt",
+        file_name="agent-evaluation-benchmark.txt",
         mime="text/plain",
         on_click="ignore",
         width="stretch",
@@ -363,8 +420,10 @@ def _about() -> None:
 合成情境、受限制工具、結構化 Handoff、獨立安全審查、Evidence-bound report
 與受控 Benchmark，讓每個決策都能被重播與稽核。
 
-目前 Planner 採用 deterministic rule-based policy。專案**沒有使用 LLM、外部 API、
-真實生產設備或機密工廠資料**，因此畫面結果不代表真實產線準確率。
+目前 App 預設採用 deterministic hypothesis-driven utility policy，並保留 rule-based baseline。
+核心另提供 provider-neutral 的 Structured LLM Planner adapter，但公開 App **沒有呼叫 LLM 或外部 API**；
+模型只能提出結構化決策，Tool allowlist、參數、Evidence 與 fallback 仍由 deterministic runtime 控制。
+專案也不連接真實生產設備或使用機密工廠資料，因此畫面結果不代表真實產線準確率。
 """
     )
 
@@ -381,7 +440,7 @@ def main() -> None:
         (WORKBENCH_PAGE, BENCHMARK_PAGE, ABOUT_PAGE),
     )
     st.sidebar.caption(
-        "可重播 · 合成資料 · 只讀診斷 · 無 LLM"
+        "可重播 · 合成資料 · 只讀診斷 · 預設無 LLM"
     )
     st.sidebar.caption(f"介面版本：{APP_RELEASE}")
 

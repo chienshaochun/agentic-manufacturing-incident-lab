@@ -1,5 +1,6 @@
 from agentic_manufacturing_incident_lab.agent import RuleBasedPlanner, SingleAgentRunner
 from agentic_manufacturing_incident_lab.domain.task import TaskStatus
+from agentic_manufacturing_incident_lab.evaluation import measure_agent_operations
 from agentic_manufacturing_incident_lab.recovery import RecoveryDisposition
 from agentic_manufacturing_incident_lab.runtime import (
     RetryPolicy,
@@ -76,6 +77,7 @@ def test_retry_exhaustion_uses_one_alternative_then_stops_without_evidence() -> 
         for assessment in run.safety_assessments
     )
     assert run.evidence == ()
+    assert measure_agent_operations(run).recovery_success_rate == 1.0
 
 
 def test_failed_alternative_safe_stops_without_cycling_back() -> None:
@@ -96,6 +98,7 @@ def test_failed_alternative_safe_stops_without_cycling_back() -> None:
     ]
     assert "No untried allowlisted alternative" in run.final_state.reason
     assert run.evidence == ()
+    assert measure_agent_operations(run).recovery_success_rate == 0.0
 
 
 def test_permanent_failure_safe_stops_without_trying_alternative() -> None:

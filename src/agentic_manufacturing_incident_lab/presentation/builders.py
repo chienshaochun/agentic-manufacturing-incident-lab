@@ -14,6 +14,7 @@ from agentic_manufacturing_incident_lab.presentation.models import (
     EvidenceView,
     FailureView,
     HandoffView,
+    HypothesisView,
     MetricCard,
     ReportView,
     SafetyView,
@@ -61,6 +62,43 @@ def _case_metrics(result: BenchmarkCaseResult) -> tuple[MetricCard, ...]:
             label="證據召回率 Recall",
             value=f"{metrics.evidence_recall:.3f}",
             help_text="預期主張中，被診斷流程成功找出的比例。",
+        ),
+        MetricCard(
+            label="假設解析率 Resolution",
+            value=(
+                f"{metrics.hypothesis_resolution_rate:.3f}"
+                if metrics.hypothesis_resolution_rate is not None
+                else "n/a"
+            ),
+            help_text="已有 Observation 支持或排除的候選假設比例。",
+        ),
+        MetricCard(
+            label="無根據主張 Unsupported",
+            value=f"{metrics.unsupported_claim_rate:.3f}",
+            help_text="缺少既有 Observation 與 supported hypothesis 支持的 Evidence 比例。",
+        ),
+        MetricCard(
+            label="重複工具率 Redundant",
+            value=f"{metrics.redundant_tool_call_rate:.3f}",
+            help_text="相同工具與相同參數被再次呼叫的比例。",
+        ),
+        MetricCard(
+            label="取得證據動作數 Actions",
+            value=(
+                str(metrics.actions_to_evidence)
+                if metrics.actions_to_evidence is not None
+                else "n/a"
+            ),
+            help_text="建立第一筆 Evidence 前執行的邏輯 Action 數。",
+        ),
+        MetricCard(
+            label="恢復成功率 Recovery",
+            value=(
+                f"{metrics.recovery_success_rate:.3f}"
+                if metrics.recovery_success_rate is not None
+                else "n/a"
+            ),
+            help_text="被 Recovery Policy 選中的替代 Tool 成功完成比例。",
         ),
         MetricCard(
             label="基準結果 Benchmark",
@@ -146,6 +184,27 @@ def _evidence(result: BenchmarkCaseResult) -> tuple[EvidenceView, ...]:
     )
 
 
+def _hypotheses(result: BenchmarkCaseResult) -> tuple[HypothesisView, ...]:
+    if result.run.diagnostic is None:
+        return ()
+    return tuple(
+        HypothesisView(
+            hypothesis_id=hypothesis.hypothesis_id,
+            statement=localize_text(hypothesis.statement),
+            status=hypothesis.status.value,
+            confidence=hypothesis.confidence,
+            supporting_observation_ids=", ".join(
+                hypothesis.supporting_observation_ids
+            ),
+            contradicting_observation_ids=", ".join(
+                hypothesis.contradicting_observation_ids
+            ),
+            rationale=hypothesis.rationale,
+        )
+        for hypothesis in result.run.diagnostic.run.hypotheses
+    )
+
+
 def _safety(result: BenchmarkCaseResult) -> SafetyView | None:
     if result.run.safety_review is None:
         return None
@@ -202,6 +261,7 @@ def build_case_presentation(result: BenchmarkCaseResult) -> CasePresentation:
         metrics=_case_metrics(result),
         handoffs=_handoffs(result),
         action_attempts=_action_attempts(result),
+        hypotheses=_hypotheses(result),
         evidence=_evidence(result),
         safety=_safety(result),
         report=_report(result),
@@ -229,6 +289,43 @@ def build_benchmark_presentation(
             "所有案例的 Evidence recall 巨觀平均。",
         ),
         MetricCard(
+            "假設解析率 Resolution",
+            (
+                f"{summary.mean_hypothesis_resolution_rate:.3f}"
+                if summary.mean_hypothesis_resolution_rate is not None
+                else "n/a"
+            ),
+            "有假設紀錄案例的平均解析比例。",
+        ),
+        MetricCard(
+            "無根據主張 Unsupported",
+            f"{summary.mean_unsupported_claim_rate:.3f}",
+            "所有案例的無根據 Evidence 比率。",
+        ),
+        MetricCard(
+            "重複工具率 Redundant",
+            f"{summary.mean_redundant_tool_call_rate:.3f}",
+            "所有案例重複相同 Tool 與 parameters 的平均比例。",
+        ),
+        MetricCard(
+            "平均取證動作 Actions",
+            (
+                f"{summary.mean_actions_to_evidence:.3f}"
+                if summary.mean_actions_to_evidence is not None
+                else "n/a"
+            ),
+            "有產生 Evidence 的案例平均使用多少 Action。",
+        ),
+        MetricCard(
+            "恢復成功率 Recovery",
+            (
+                f"{summary.mean_recovery_success_rate:.3f}"
+                if summary.mean_recovery_success_rate is not None
+                else "n/a"
+            ),
+            "有啟動替代路徑時的平均成功比例。",
+        ),
+        MetricCard(
             "實際呼叫 Physical calls",
             str(summary.total_tool_calls),
             "所有案例的工具實際執行次數。",
@@ -250,6 +347,9 @@ def build_benchmark_presentation(
             ),
             precision=result.metrics.evidence_precision,
             recall=result.metrics.evidence_recall,
+            hypothesis_resolution=result.metrics.hypothesis_resolution_rate,
+            unsupported_claim_rate=result.metrics.unsupported_claim_rate,
+            redundant_tool_rate=result.metrics.redundant_tool_call_rate,
             tool_calls=result.metrics.tool_call_count,
             handoffs=result.metrics.handoff_count,
             failure=(

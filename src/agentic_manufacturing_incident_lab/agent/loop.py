@@ -19,6 +19,7 @@ from agentic_manufacturing_incident_lab.agent.memory import (
 )
 from agentic_manufacturing_incident_lab.domain.execution import ActionResultStatus
 from agentic_manufacturing_incident_lab.domain.models import Action, Evidence, Incident
+from agentic_manufacturing_incident_lab.hypotheses import HypothesisPolicy
 from agentic_manufacturing_incident_lab.domain.task import (
     TaskState,
     TaskStatus,
@@ -56,6 +57,7 @@ class SingleAgentRunner:
     __slots__ = (
         "_action_limit",
         "_executor",
+        "_hypothesis_policy",
         "_policy",
         "_recovery_policy",
         "_registry",
@@ -71,6 +73,7 @@ class SingleAgentRunner:
         safety_policy: SafetyPolicy | None = None,
         retry_policy: RetryPolicy | None = None,
         recovery_policy: RecoveryPolicy | None = None,
+        hypothesis_policy: HypothesisPolicy | None = None,
     ) -> None:
         if (
             isinstance(action_limit, bool)
@@ -84,6 +87,7 @@ class SingleAgentRunner:
         self._action_limit = action_limit
         self._safety_policy = safety_policy or RiskBasedSafetyPolicy()
         self._recovery_policy = recovery_policy or RuleBasedRecoveryPolicy()
+        self._hypothesis_policy = hypothesis_policy
 
     def run(
         self,
@@ -266,6 +270,19 @@ class SingleAgentRunner:
         pause_after_actions: int | None,
     ) -> InvestigationRun:
         while True:
+            hypotheses = self._current_hypotheses(
+                incident,
+                executions,
+                evaluated_at=self._latest_time(
+                    task_states,
+                    executions,
+                    memory_states,
+                    safety_assessments,
+                    approval_requests,
+                    approval_decisions,
+                    recovery_assessments,
+                ),
+            )
             context = AgentContext(
                 incident=incident,
                 known_asset_ids=known_asset_ids,
@@ -273,6 +290,7 @@ class SingleAgentRunner:
                 available_tools=self._registry.specs,
                 working_memory=memory_states[-1],
                 executions=tuple(executions),
+                hypotheses=hypotheses,
             )
             if pause_after_actions is not None and len(executions) >= pause_after_actions:
                 return self._snapshot_run(
@@ -511,8 +529,8 @@ class SingleAgentRunner:
         ):
             raise ValueError("runner recovery policy must match checkpoint policy")
 
-    @staticmethod
     def _snapshot_run(
+        self,
         *,
         incident: Incident,
         task_states: list[TaskState],
@@ -523,10 +541,24 @@ class SingleAgentRunner:
         approval_decisions: list[ApprovalDecision],
         recovery_assessments: list[RecoveryAssessment],
     ) -> InvestigationRun:
+        hypotheses = self._current_hypotheses(
+            incident,
+            executions,
+            evaluated_at=self._latest_time(
+                task_states,
+                executions,
+                memory_states,
+                safety_assessments,
+                approval_requests,
+                approval_decisions,
+                recovery_assessments,
+            ),
+        )
         return InvestigationRun(
             incident=incident,
             task_states=tuple(task_states),
             executions=tuple(executions),
+            hypotheses=hypotheses,
             memory_states=tuple(memory_states),
             safety_assessments=tuple(safety_assessments),
             approval_requests=tuple(approval_requests),
@@ -541,9 +573,8 @@ class SingleAgentRunner:
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
             raise ValueError("pause_after_actions must be a non-negative integer")
 
-    @classmethod
     def _complete_run(
-        cls,
+        self,
         *,
         incident: Incident,
         task_states: list[TaskState],
@@ -561,7 +592,7 @@ class SingleAgentRunner:
             for observation in record.observations
         }
         if not set(decision.observation_ids).issubset(known_observation_ids):
-            return cls._stop_run(
+            return self._stop_run(
                 incident=incident,
                 task_states=task_states,
                 executions=executions,
@@ -576,7 +607,7 @@ class SingleAgentRunner:
                 ),
             )
 
-        latest_time = cls._latest_time(
+        latest_time = self._latest_time(
             task_states,
             executions,
             memory_states,
@@ -605,11 +636,17 @@ class SingleAgentRunner:
             reason=decision.rationale,
             updated_at=latest_time + timedelta(seconds=3),
         )
+        hypotheses = self._current_hypotheses(
+            incident,
+            executions,
+            evaluated_at=completed.updated_at,
+        )
         return InvestigationRun(
             incident=incident,
             task_states=(*task_states, completed),
             executions=tuple(executions),
             evidence=(evidence,),
+            hypotheses=hypotheses,
             memory_states=tuple(memory_states),
             safety_assessments=tuple(safety_assessments),
             approval_requests=tuple(approval_requests),
@@ -617,9 +654,8 @@ class SingleAgentRunner:
             recovery_assessments=tuple(recovery_assessments),
         )
 
-    @classmethod
     def _stop_run(
-        cls,
+        self,
         *,
         incident: Incident,
         task_states: list[TaskState],
@@ -635,7 +671,7 @@ class SingleAgentRunner:
             task_states[-1],
             TaskStatus.SAFE_STOPPED,
             reason=reason,
-            updated_at=cls._latest_time(
+            updated_at=self._latest_time(
                 task_states,
                 executions,
                 memory_states,
@@ -646,15 +682,41 @@ class SingleAgentRunner:
             )
             + timedelta(seconds=1),
         )
+        hypotheses = self._current_hypotheses(
+            incident,
+            executions,
+            evaluated_at=stopped.updated_at,
+        )
         return InvestigationRun(
             incident=incident,
             task_states=(*task_states, stopped),
             executions=tuple(executions),
+            hypotheses=hypotheses,
             memory_states=tuple(memory_states),
             safety_assessments=tuple(safety_assessments),
             approval_requests=tuple(approval_requests),
             approval_decisions=tuple(approval_decisions),
             recovery_assessments=tuple(recovery_assessments),
+        )
+
+    def _current_hypotheses(
+        self,
+        incident: Incident,
+        executions: list[ActionExecutionRecord],
+        *,
+        evaluated_at: datetime,
+    ):
+        if self._hypothesis_policy is None:
+            return ()
+        observations = tuple(
+            observation
+            for record in executions
+            for observation in record.observations
+        )
+        return self._hypothesis_policy.evaluate(
+            incident,
+            observations,
+            evaluated_at=evaluated_at,
         )
 
     @staticmethod

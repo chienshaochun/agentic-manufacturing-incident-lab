@@ -116,6 +116,11 @@ class BenchmarkMetrics:
     collaboration_failure_count: int
     tool_budget_met: bool
     handoff_budget_met: bool
+    hypothesis_resolution_rate: float | None = None
+    unsupported_claim_rate: float = 0.0
+    redundant_tool_call_rate: float = 0.0
+    actions_to_evidence: int | None = None
+    recovery_success_rate: float | None = None
 
     def __post_init__(self) -> None:
         for field_name in (
@@ -133,11 +138,22 @@ class BenchmarkMetrics:
         _require_score(self.evidence_precision, "evidence_precision")
         _require_score(self.evidence_recall, "evidence_recall")
         for field_name in (
+            "hypothesis_resolution_rate",
+            "recovery_success_rate",
+        ):
+            value = getattr(self, field_name)
+            if value is not None:
+                _require_score(value, field_name)
+        _require_score(self.unsupported_claim_rate, "unsupported_claim_rate")
+        _require_score(self.redundant_tool_call_rate, "redundant_tool_call_rate")
+        for field_name in (
             "tool_call_count",
             "handoff_count",
             "collaboration_failure_count",
         ):
             _require_non_negative_int(getattr(self, field_name), field_name)
+        if self.actions_to_evidence is not None:
+            _require_non_negative_int(self.actions_to_evidence, "actions_to_evidence")
 
     @property
     def passed(self) -> bool:

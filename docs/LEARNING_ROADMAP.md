@@ -66,6 +66,30 @@
 
 物理意義：把控制室、批准面板和交班報告整合成可供面試展示的操作台。
 
+## Phase 9：Hypothesis Engine
+
+建立競爭故障假設、支持與反對Signal、狀態評分、checkpoint保存及UI呈現。
+
+物理意義：在調查白板列出所有候選原因，每次量測都要說明排除了什麼、保留了什麼，而不是只記錄最後答案。
+
+## Phase 10：動態工具選擇
+
+依假設資訊價值、操作風險、成本、重複呼叫與Action budget選擇下一個Tool。
+
+## Phase 11：真實感製造情境
+
+加入Alarm history、設備設定、維護紀錄、Sensor freshness與多個可能根因。
+
+## Phase 12：Structured LLM Planner
+
+新增可選配的結構化LLM策略，並保留Tool白名單、Schema驗證、安全政策與Rule-based fallback。
+
+## Phase 13：Agent能力評估
+
+增加假設解決率、無依據主張率、重複Tool率、Evidence所需Action數與恢復成功率。
+
+完成狀態：已完成，並加入五個 connectivity cases 的 Planner A/B Dashboard。各指標的計算與限制見 [Phase 13 說明](PHASE_13_AGENT_EVALUATION.md)。
+
 ## 技術採用順序
 
 - 核心先使用 Python 3.12 與標準函式庫，保持行為透明。
@@ -81,4 +105,3 @@
 - 使用可重播情境與指標評估，而非只看展示結果
 - 解釋多 Agent 的必要性、成本與失敗模式
 - 將 Agentic AI 系統清楚呈現在程式碼、測試、UI 與面試敘事中
-

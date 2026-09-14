@@ -20,11 +20,11 @@ def result_by_id(summary: BenchmarkSummary, case_id: str) -> BenchmarkCaseResult
     return next(result for result in summary.results if result.case_id == case_id)
 
 
-def test_default_controlled_benchmark_passes_all_six_cases() -> None:
+def test_default_controlled_benchmark_passes_all_eight_cases() -> None:
     summary = run_controlled_benchmark()
 
-    assert summary.case_count == 6
-    assert summary.passed_count == 6
+    assert summary.case_count == 8
+    assert summary.passed_count == 8
     assert summary.failed_count == 0
     assert summary.pass_rate == 1.0
     assert summary.all_passed is True
@@ -36,8 +36,8 @@ def test_summary_reports_evidence_and_resource_aggregates() -> None:
 
     assert summary.mean_evidence_precision == 1.0
     assert summary.mean_evidence_recall == 1.0
-    assert summary.total_tool_calls == 14
-    assert summary.total_handoffs == 30
+    assert summary.total_tool_calls == 26
+    assert summary.total_handoffs == 42
 
 
 def test_completed_case_has_exact_correctness_and_cost_metrics() -> None:
@@ -59,6 +59,11 @@ def test_completed_case_has_exact_correctness_and_cost_metrics() -> None:
     assert metrics.collaboration_failure_count == 0
     assert metrics.tool_budget_met is True
     assert metrics.handoff_budget_met is True
+    assert metrics.hypothesis_resolution_rate == pytest.approx(2 / 3)
+    assert metrics.unsupported_claim_rate == 0.0
+    assert metrics.redundant_tool_call_rate == 0.0
+    assert metrics.actions_to_evidence == 3
+    assert metrics.recovery_success_rate is None
 
 
 def test_shared_infrastructure_case_rewards_correct_silence() -> None:
@@ -91,13 +96,18 @@ def test_actual_wrong_claim_lowers_precision_and_recall() -> None:
 
     assert rescored.metrics.evidence_precision == 0.0
     assert rescored.metrics.evidence_recall == 0.0
+    assert rescored.metrics.unsupported_claim_rate == 1.0
     assert rescored.passed is False
 
 
 def test_tighter_expectation_detects_tool_and_handoff_budget_overrun() -> None:
     cases = build_controlled_benchmark_catalog()
     normal = run_benchmark_case(cases[1])
-    budget_expectation = cases[-1].expectation
+    budget_expectation = next(
+        case.expectation
+        for case in cases
+        if case.case_id == "action-budget-safe-stop-seed-43"
+    )
 
     rescored = evaluate_benchmark_run(budget_expectation, normal.run)
 

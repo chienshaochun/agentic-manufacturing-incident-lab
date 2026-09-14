@@ -18,6 +18,10 @@ from agentic_manufacturing_incident_lab.domain.models import (
     ActionRisk,
     Incident,
 )
+from agentic_manufacturing_incident_lab.hypotheses import (
+    ConnectivityHypothesisPolicy,
+    HypothesisPolicy,
+)
 from agentic_manufacturing_incident_lab.runtime import RetryPolicy
 from agentic_manufacturing_incident_lab.tools import ToolRegistry
 
@@ -34,6 +38,7 @@ class DiagnosticAgent:
         registry: ToolRegistry,
         action_limit: int = 32,
         retry_policy: RetryPolicy | None = None,
+        hypothesis_policy: HypothesisPolicy | None = None,
     ) -> None:
         if any(spec.risk is not ActionRisk.READ_ONLY for spec in registry.specs):
             raise ValueError("DiagnosticAgent may only receive read-only tools")
@@ -42,6 +47,9 @@ class DiagnosticAgent:
             registry=registry,
             action_limit=action_limit,
             retry_policy=retry_policy,
+            hypothesis_policy=(
+                hypothesis_policy or ConnectivityHypothesisPolicy()
+            ),
         )
 
     def handle(

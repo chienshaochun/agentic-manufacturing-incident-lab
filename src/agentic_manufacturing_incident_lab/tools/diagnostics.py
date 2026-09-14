@@ -85,3 +85,72 @@ class TelemetryTool:
             summary=f"Telemetry measurement completed for {asset_id}.",
             observations=(observation,),
         )
+
+
+class _AssetReadTool:
+    """Shared implementation for single-asset read-only diagnostic tools."""
+
+    __slots__ = ("_environment",)
+    spec: ToolSpec
+    _method_name: str
+    _result_label: str
+
+    def __init__(self, environment: SimulatedEnvironment) -> None:
+        self._environment = environment
+
+    def invoke(self, action: Action) -> ToolResponse:
+        _require_matching_incident(action, self._environment)
+        asset_id = cast(str, action.parameters["asset_id"])
+        observation = getattr(self._environment, self._method_name)(asset_id)
+        return ToolResponse(
+            summary=f"{self._result_label} completed for {asset_id}.",
+            observations=(observation,),
+        )
+
+
+def _asset_read_spec(name: str, description: str) -> ToolSpec:
+    return ToolSpec(
+        name=name,
+        description=description,
+        risk=ActionRisk.READ_ONLY,
+        parameters=(
+            ToolParameter(
+                name="asset_id",
+                description="Synthetic asset identifier to inspect.",
+                value_type=ToolParameterType.STRING,
+            ),
+        ),
+    )
+
+
+class AlarmHistoryTool(_AssetReadTool):
+    spec = _asset_read_spec("read_alarm_history", "Read recent alarms for one asset.")
+    _method_name = "read_alarm_history"
+    _result_label = "Alarm history read"
+
+
+class ConfigurationTool(_AssetReadTool):
+    spec = _asset_read_spec(
+        "inspect_configuration",
+        "Compare actual and expected configuration for one asset.",
+    )
+    _method_name = "inspect_configuration"
+    _result_label = "Configuration inspection"
+
+
+class MaintenanceRecordTool(_AssetReadTool):
+    spec = _asset_read_spec(
+        "read_maintenance_record",
+        "Read the planned-maintenance state for one asset.",
+    )
+    _method_name = "read_maintenance_record"
+    _result_label = "Maintenance record read"
+
+
+class SensorFreshnessTool(_AssetReadTool):
+    spec = _asset_read_spec(
+        "check_sensor_freshness",
+        "Check the age and freshness of sensor data for one asset.",
+    )
+    _method_name = "check_sensor_freshness"
+    _result_label = "Sensor freshness measurement"

@@ -27,9 +27,12 @@ def test_completed_case_presentation_contains_all_ui_sections() -> None:
     assert view.workflow_status == "completed"
     assert view.diagnostic_status == "completed"
     assert view.passed is True
-    assert len(view.metrics) == 7
+    assert len(view.metrics) == 12
     assert len(view.handoffs) == 6
     assert len(view.action_attempts) == 3
+    assert len(view.hypotheses) == 3
+    assert view.hypotheses[0].status == "supported"
+    assert "單一工作站 ST-02" in view.hypotheses[0].statement
     assert len(view.evidence) == 1
     assert view.safety is not None
     assert view.safety.outcome == "approved"
@@ -57,6 +60,7 @@ def test_diagnostic_failure_presentation_has_failure_but_no_products() -> None:
     assert view.diagnostic_status == "none"
     assert len(view.handoffs) == 1
     assert view.action_attempts == ()
+    assert view.hypotheses == ()
     assert view.evidence == ()
     assert view.safety is None
     assert view.report is None
@@ -79,15 +83,20 @@ def test_benchmark_presentation_contains_aggregate_cards_and_rows() -> None:
     view = build_benchmark_presentation(run_phase7_benchmark())
 
     assert tuple(card.value for card in view.metrics) == (
-        "11",
-        "11",
+        "13",
+        "13",
         "1.000",
         "1.000",
         "1.000",
-        "21",
-        "44",
+        "0.636",
+        "0.000",
+        "0.000",
+        "3.857",
+        "n/a",
+        "33",
+        "56",
     )
-    assert len(view.rows) == 11
+    assert len(view.rows) == 13
     assert all(row.passed for row in view.rows)
     assert view.rows[-1].failure == "conflicting_result"
     assert "- 是否全部通過： yes" in view.summary_text

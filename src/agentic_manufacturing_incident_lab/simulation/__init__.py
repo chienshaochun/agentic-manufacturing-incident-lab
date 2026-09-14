@@ -1,6 +1,8 @@
 """Deterministic synthetic scenarios used by the training environment."""
 
 from agentic_manufacturing_incident_lab.simulation.catalog import (
+    build_configuration_drift_scenario,
+    build_sensor_staleness_scenario,
     build_shared_connectivity_scenario,
     build_station_connectivity_scenario,
     build_telemetry_path_scenario,
@@ -19,6 +21,8 @@ __all__ = [
     "ScenarioBrief",
     "ScenarioDefinition",
     "SimulatedEnvironment",
+    "build_configuration_drift_scenario",
+    "build_sensor_staleness_scenario",
     "build_shared_connectivity_scenario",
     "build_station_connectivity_scenario",
     "build_telemetry_path_scenario",

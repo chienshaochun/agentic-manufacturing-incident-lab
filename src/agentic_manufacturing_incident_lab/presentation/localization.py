@@ -237,6 +237,11 @@ def localize_trace(trace: str) -> str:
         ("- failure signature correct:", "- Failure signature 正確："),
         ("- physical tool calls:", "- 實際工具呼叫："),
         ("- coordination handoffs:", "- Agent 交接次數："),
+        ("- hypothesis resolution rate:", "- 假設解析率："),
+        ("- unsupported claim rate:", "- 無根據主張率："),
+        ("- redundant tool call rate:", "- 重複工具呼叫率："),
+        ("- actions to evidence:", "- 取得 Evidence 的動作數："),
+        ("- recovery success rate:", "- 恢復成功率："),
         ("- passed:", "- 是否通過："),
         ("- none", "- 無"),
     )
@@ -267,6 +272,11 @@ def localize_benchmark_summary(summary: str) -> str:
         ("- mean evidence recall:", "- 平均 Evidence recall："),
         ("- physical tool calls:", "- 實際工具呼叫："),
         ("- coordination handoffs:", "- Agent 交接次數："),
+        ("- mean hypothesis resolution:", "- 平均假設解析率："),
+        ("- unsupported claim rate:", "- 無根據主張率："),
+        ("- redundant tool call rate:", "- 重複工具呼叫率："),
+        ("- mean actions to evidence:", "- 平均取得 Evidence 動作數："),
+        ("- recovery success rate:", "- 恢復成功率："),
         ("- all passed:", "- 是否全部通過："),
     )
     for source, target in replacements:

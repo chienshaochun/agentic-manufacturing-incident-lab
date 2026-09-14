@@ -1,5 +1,10 @@
 """Controlled benchmark contracts and evaluators."""
 
+from agentic_manufacturing_incident_lab.evaluation.agent_metrics import (
+    AgentOperationalMetrics,
+    measure_agent_operations,
+)
+
 from agentic_manufacturing_incident_lab.evaluation.catalog import (
     BenchmarkCase,
     SpecialistFault,
@@ -25,6 +30,7 @@ from agentic_manufacturing_incident_lab.evaluation.rendering import (
 )
 
 __all__ = [
+    "AgentOperationalMetrics",
     "BenchmarkCase",
     "BenchmarkCaseResult",
     "BenchmarkExpectation",
@@ -35,6 +41,7 @@ __all__ = [
     "build_phase7_benchmark_catalog",
     "build_specialist_failure_catalog",
     "evaluate_benchmark_run",
+    "measure_agent_operations",
     "render_benchmark_summary",
     "render_benchmark_trace",
     "run_benchmark_case",

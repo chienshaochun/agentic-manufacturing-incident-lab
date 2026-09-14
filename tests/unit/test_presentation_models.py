@@ -27,7 +27,7 @@ def test_completed_case_presentation_contains_all_ui_sections() -> None:
     assert view.workflow_status == "completed"
     assert view.diagnostic_status == "completed"
     assert view.passed is True
-    assert len(view.metrics) == 7
+    assert len(view.metrics) == 12
     assert len(view.handoffs) == 6
     assert len(view.action_attempts) == 3
     assert len(view.hypotheses) == 3
@@ -88,6 +88,11 @@ def test_benchmark_presentation_contains_aggregate_cards_and_rows() -> None:
         "1.000",
         "1.000",
         "1.000",
+        "0.636",
+        "0.000",
+        "0.000",
+        "3.857",
+        "n/a",
         "33",
         "56",
     )

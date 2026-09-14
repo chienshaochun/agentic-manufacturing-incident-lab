@@ -106,6 +106,9 @@ class BenchmarkRow:
     diagnostic: str
     precision: float
     recall: float
+    hypothesis_resolution: float | None
+    unsupported_claim_rate: float
+    redundant_tool_rate: float
     tool_calls: int
     handoffs: int
     failure: str

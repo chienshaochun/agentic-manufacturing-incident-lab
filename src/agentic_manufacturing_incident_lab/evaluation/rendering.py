@@ -29,6 +29,9 @@ def render_benchmark_summary(summary: BenchmarkSummary) -> str:
         "Diagnostic",
         "Precision",
         "Recall",
+        "Resolved",
+        "Unsupported",
+        "Redundant",
         "Calls",
         "Handoffs",
         "Failure",
@@ -43,6 +46,13 @@ def render_benchmark_summary(summary: BenchmarkSummary) -> str:
             else "none",
             f"{result.metrics.evidence_precision:.2f}",
             f"{result.metrics.evidence_recall:.2f}",
+            (
+                f"{result.metrics.hypothesis_resolution_rate:.2f}"
+                if result.metrics.hypothesis_resolution_rate is not None
+                else "n/a"
+            ),
+            f"{result.metrics.unsupported_claim_rate:.2f}",
+            f"{result.metrics.redundant_tool_call_rate:.2f}",
             str(result.metrics.tool_call_count),
             str(result.metrics.handoff_count),
             ",".join(failure.kind.value for failure in result.run.failures)
@@ -59,6 +69,23 @@ def render_benchmark_summary(summary: BenchmarkSummary) -> str:
         f"- pass rate: {summary.pass_rate:.3f}\n"
         f"- mean evidence precision: {summary.mean_evidence_precision:.3f}\n"
         f"- mean evidence recall: {summary.mean_evidence_recall:.3f}\n"
+        "- mean hypothesis resolution: "
+        f"{summary.mean_hypothesis_resolution_rate:.3f}\n"
+        if summary.mean_hypothesis_resolution_rate is not None
+        else "- mean hypothesis resolution: n/a\n"
+    ) + (
+        f"- unsupported claim rate: {summary.mean_unsupported_claim_rate:.3f}\n"
+        f"- redundant tool call rate: {summary.mean_redundant_tool_call_rate:.3f}\n"
+        "- mean actions to evidence: "
+        f"{summary.mean_actions_to_evidence:.3f}\n"
+        if summary.mean_actions_to_evidence is not None
+        else "- mean actions to evidence: n/a\n"
+    ) + (
+        "- recovery success rate: "
+        f"{summary.mean_recovery_success_rate:.3f}\n"
+        if summary.mean_recovery_success_rate is not None
+        else "- recovery success rate: n/a\n"
+    ) + (
         f"- physical tool calls: {summary.total_tool_calls}\n"
         f"- coordination handoffs: {summary.total_handoffs}\n"
         f"- all passed: {'yes' if summary.all_passed else 'no'}"
@@ -187,6 +214,26 @@ def render_benchmark_trace(result: BenchmarkCaseResult) -> str:
             f"{'yes' if metrics.failure_signature_correct else 'no'}",
             f"- physical tool calls: {metrics.tool_call_count}",
             f"- coordination handoffs: {metrics.handoff_count}",
+            "- hypothesis resolution rate: "
+            + (
+                f"{metrics.hypothesis_resolution_rate:.3f}"
+                if metrics.hypothesis_resolution_rate is not None
+                else "n/a"
+            ),
+            f"- unsupported claim rate: {metrics.unsupported_claim_rate:.3f}",
+            f"- redundant tool call rate: {metrics.redundant_tool_call_rate:.3f}",
+            "- actions to evidence: "
+            + (
+                str(metrics.actions_to_evidence)
+                if metrics.actions_to_evidence is not None
+                else "n/a"
+            ),
+            "- recovery success rate: "
+            + (
+                f"{metrics.recovery_success_rate:.3f}"
+                if metrics.recovery_success_rate is not None
+                else "n/a"
+            ),
             f"- passed: {'yes' if result.passed else 'no'}",
         )
     )

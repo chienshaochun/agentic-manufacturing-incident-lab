@@ -59,6 +59,11 @@ def test_completed_case_has_exact_correctness_and_cost_metrics() -> None:
     assert metrics.collaboration_failure_count == 0
     assert metrics.tool_budget_met is True
     assert metrics.handoff_budget_met is True
+    assert metrics.hypothesis_resolution_rate == pytest.approx(2 / 3)
+    assert metrics.unsupported_claim_rate == 0.0
+    assert metrics.redundant_tool_call_rate == 0.0
+    assert metrics.actions_to_evidence == 3
+    assert metrics.recovery_success_rate is None
 
 
 def test_shared_infrastructure_case_rewards_correct_silence() -> None:
@@ -91,6 +96,7 @@ def test_actual_wrong_claim_lowers_precision_and_recall() -> None:
 
     assert rescored.metrics.evidence_precision == 0.0
     assert rescored.metrics.evidence_recall == 0.0
+    assert rescored.metrics.unsupported_claim_rate == 1.0
     assert rescored.passed is False
 
 

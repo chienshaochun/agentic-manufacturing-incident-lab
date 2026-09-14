@@ -210,3 +210,24 @@ def test_metrics_reject_invalid_counts(field_name: str, value) -> None:
 def test_imperfect_precision_or_recall_fails_benchmark() -> None:
     assert replace(passing_metrics(), evidence_precision=0.5).passed is False
     assert replace(passing_metrics(), evidence_recall=0.5).passed is False
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "hypothesis_resolution_rate",
+        "unsupported_claim_rate",
+        "redundant_tool_call_rate",
+        "recovery_success_rate",
+    ],
+)
+@pytest.mark.parametrize("value", [-0.01, 1.01, True, "1.0"])
+def test_metrics_reject_invalid_operational_rates(field_name: str, value) -> None:
+    with pytest.raises(ValueError, match=field_name):
+        replace(passing_metrics(), **{field_name: value})
+
+
+@pytest.mark.parametrize("value", [-1, True, 1.5])
+def test_metrics_reject_invalid_actions_to_evidence(value) -> None:
+    with pytest.raises(ValueError, match="actions_to_evidence"):
+        replace(passing_metrics(), actions_to_evidence=value)

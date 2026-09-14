@@ -28,6 +28,9 @@ from agentic_manufacturing_incident_lab.simulation import SimulatedEnvironment
 from agentic_manufacturing_incident_lab.hypotheses import (
     ManufacturingSignalHypothesisPolicy,
 )
+from agentic_manufacturing_incident_lab.evaluation.agent_metrics import (
+    measure_agent_operations,
+)
 from agentic_manufacturing_incident_lab.tools import (
     build_diagnostic_registry,
     build_manufacturing_diagnostic_registry,
@@ -171,6 +174,44 @@ class BenchmarkSummary:
             result.metrics.evidence_recall for result in self.results
         ) / self.case_count
 
+    @staticmethod
+    def _mean_available(values: tuple[float | int | None, ...]) -> float | None:
+        available = tuple(value for value in values if value is not None)
+        return sum(available) / len(available) if available else None
+
+    @property
+    def mean_hypothesis_resolution_rate(self) -> float | None:
+        return self._mean_available(
+            tuple(
+                result.metrics.hypothesis_resolution_rate
+                for result in self.results
+            )
+        )
+
+    @property
+    def mean_unsupported_claim_rate(self) -> float:
+        return sum(
+            result.metrics.unsupported_claim_rate for result in self.results
+        ) / self.case_count
+
+    @property
+    def mean_redundant_tool_call_rate(self) -> float:
+        return sum(
+            result.metrics.redundant_tool_call_rate for result in self.results
+        ) / self.case_count
+
+    @property
+    def mean_actions_to_evidence(self) -> float | None:
+        return self._mean_available(
+            tuple(result.metrics.actions_to_evidence for result in self.results)
+        )
+
+    @property
+    def mean_recovery_success_rate(self) -> float | None:
+        return self._mean_available(
+            tuple(result.metrics.recovery_success_rate for result in self.results)
+        )
+
     @property
     def total_tool_calls(self) -> int:
         return sum(result.metrics.tool_call_count for result in self.results)
@@ -216,6 +257,7 @@ def evaluate_benchmark_run(
     actual_failure_kinds = tuple(failure.kind for failure in run.failures)
     tool_call_count = _tool_call_count(run)
     handoff_count = len(run.ledger.handoffs)
+    operations = measure_agent_operations(diagnostic)
 
     metrics = BenchmarkMetrics(
         status_correct=(
@@ -242,6 +284,14 @@ def evaluate_benchmark_run(
         collaboration_failure_count=len(run.failures),
         tool_budget_met=tool_call_count <= expectation.max_tool_calls,
         handoff_budget_met=handoff_count <= expectation.max_handoffs,
+        hypothesis_resolution_rate=operations.hypothesis_resolution_rate,
+        unsupported_claim_rate=max(
+            operations.unsupported_claim_rate,
+            1.0 - evidence_precision,
+        ),
+        redundant_tool_call_rate=operations.redundant_tool_call_rate,
+        actions_to_evidence=operations.actions_to_evidence,
+        recovery_success_rate=operations.recovery_success_rate,
     )
     return BenchmarkCaseResult(
         expectation=expectation,

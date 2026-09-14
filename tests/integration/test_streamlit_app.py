@@ -23,12 +23,6 @@ def load_app() -> AppTest:
     return app
 
 
-def confirm_intake(app: AppTest) -> AppTest:
-    app.checkbox[0].check().run()
-    assert app.button[0].disabled is False
-    return app
-
-
 def _expected_download_url(data: str, mimetype: str, filename: str) -> str:
     file_id = _calculate_file_id(data.encode(), mimetype, filename)
     extension = Path(filename).suffix
@@ -52,18 +46,22 @@ def test_app_loads_incident_workbench_without_running_case() -> None:
     assert len(app.selectbox[0].options) == 4
     assert app.selectbox[1].value == "isolated-station-seed-43"
     assert app.selectbox[1].label == "選擇可重播模擬批次 Simulation batch"
-    assert app.button[0].label == "執行調查 Run investigation"
-    assert app.button[0].disabled is True
-    assert app.checkbox[0].label == "我已確認上述結構化內容符合現場回報"
+    assert app.button[0].label == "確認並執行調查 Confirm & run"
+    assert app.button[0].disabled is False
+    assert len(app.checkbox) == 0
+    assert len(app.number_input) == 1
+    assert len(app.selectbox) == 5
+    assert app.text_area[0].value == "單一設備無法連線"
     assert len(app.json) == 1
-    assert any("解析來源是 manual" in caption.value for caption in app.caption)
+    assert any("工程師可直接修改" in caption.value for caption in app.caption)
+    assert any(expander.label == "技術與稽核資料（JSON）" for expander in app.expander)
     assert any("請選擇症狀與模擬批次" in info.value for info in app.info)
     assert any("answer key 在調查期間對 Agent 隱藏" in caption.value for caption in app.caption)
     assert any("介面版本：Structured Incident Intake v1" in caption.value for caption in app.caption)
 
 
 def test_run_button_executes_default_case_and_displays_metrics() -> None:
-    app = confirm_intake(load_app())
+    app = load_app()
 
     app.button[0].click().run()
 
@@ -81,18 +79,23 @@ def test_run_button_executes_default_case_and_displays_metrics() -> None:
     assert any("Planner 候選決策" in code.value for code in app.code)
 
 
-def test_operator_note_requires_confirmation_and_enters_incident_trace() -> None:
+def test_operator_can_edit_intake_before_confirming_and_running() -> None:
     app = load_app()
     note = "ST-02 可以 ping，但數值已經三十分鐘沒有更新。"
 
     app.text_area[0].input(note).run()
-
-    assert app.button[0].disabled is True
-    confirm_intake(app)
+    app.number_input[0].set_value(30).run()
+    app.selectbox[2].set_value("可以連線").run()
+    app.selectbox[3].set_value("沒有更新").run()
+    app.selectbox[4].set_value("其他設備正常").run()
     app.button[0].click().run()
 
     trace = next(code.value for code in app.code if "Benchmark 稽核軌跡" in code.value)
     assert note in trace
+    assert "duration_minutes=30" in trace
+    assert "network_reachable=True" in trace
+    assert "telemetry_available=False" in trace
+    assert "peer_affected=False" in trace
     assert any(
         "Hypothesis 不是正式 Evidence" in caption.value
         for caption in app.caption
@@ -105,7 +108,7 @@ def test_operator_note_requires_confirmation_and_enters_incident_trace() -> None
 
 
 def test_case_download_buttons_serve_chinese_markdown_and_trace() -> None:
-    app = confirm_intake(load_app())
+    app = load_app()
     app.button[0].click().run()
     view = _default_case_view()
     report = case_report_markdown(view)
@@ -147,7 +150,6 @@ def test_uncertain_symptom_batch_safe_stops_without_report() -> None:
 
     app.selectbox[0].set_value("設備在線，但製程數值持續平線").run()
     app.selectbox[1].set_value("low-quality-configuration-evidence-seed-120").run()
-    confirm_intake(app)
     app.button[0].click().run()
 
     assert not app.exception

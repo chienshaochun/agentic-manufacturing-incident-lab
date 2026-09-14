@@ -1,7 +1,6 @@
 """Interactive Streamlit workbench for the controlled incident lab."""
 
 from dataclasses import asdict, replace
-import hashlib
 
 import streamlit as st
 
@@ -96,6 +95,24 @@ BENCHMARK_PAGE = "基準測試 Benchmark Dashboard"
 ABOUT_PAGE = "關於專案 About"
 APP_RELEASE = "Structured Incident Intake v1"
 
+NETWORK_STATUS_OPTIONS = {
+    "未知／尚未檢查": None,
+    "可以連線": True,
+    "無法連線": False,
+}
+
+TELEMETRY_STATUS_OPTIONS = {
+    "未知／尚未檢查": None,
+    "持續更新": True,
+    "沒有更新": False,
+}
+
+PEER_STATUS_OPTIONS = {
+    "未知／尚未檢查": None,
+    "其他設備也受影響": True,
+    "其他設備正常": False,
+}
+
 HYPOTHESIS_STATUS_LABELS = {
     "open": "⚪ open",
     "inconclusive": "🟡 inconclusive",
@@ -132,7 +149,12 @@ def _case_with_confirmed_intake(
         incident,
         description=(
             f"{incident.description} "
-            f"Operator-confirmed report: {confirmed.intake.raw_text}"
+            f"Operator-confirmed report: {confirmed.intake.raw_text} "
+            f"[symptom_type={confirmed.intake.symptom_type.value}; "
+            f"duration_minutes={confirmed.intake.duration_minutes}; "
+            f"network_reachable={confirmed.intake.network_reachable}; "
+            f"telemetry_available={confirmed.intake.telemetry_available}; "
+            f"peer_affected={confirmed.intake.peer_affected}]"
         ),
     )
     return replace(
@@ -445,11 +467,6 @@ def _incident_workbench() -> None:
         format_func=lambda case_id: SIMULATION_BATCH_LABELS[case_id],
         help="批次只用來固定模擬世界；標籤不會透露隱藏故障原因。",
     )
-    operator_note = st.text_area(
-        "操作員補充現象 Operator note（選填）",
-        placeholder="例如：同區另一台設備正常、問題在換班後開始出現……",
-        help="Ollama 尚未啟用；目前由下拉欄位建立結構化內容，文字會保存在 Incident。",
-    )
     selected = cases[selected_id]
     incident = selected.scenario.incident
     st.markdown(f"**事件 Incident：** `{incident.incident_id}` — {incident.title}")
@@ -458,8 +475,6 @@ def _incident_workbench() -> None:
         f"**嚴重度 Severity：** `{incident.severity.value}`"
     )
     st.markdown(f"**調查目標 Goal：** {incident.goal}")
-    if operator_note.strip():
-        st.markdown(f"**操作員補充：** {operator_note.strip()}")
     st.caption(
         f"模擬批次 seed={selected.scenario.seed} · Action 上限={selected.action_limit}。"
         "Root Cause 與 Benchmark answer key 在調查期間對 Agent 隱藏。"
@@ -471,36 +486,68 @@ def _incident_workbench() -> None:
             "Evaluator 才使用 answer key 驗證結果。"
         )
 
+    st.markdown("#### 請確認事件內容")
+    st.caption(
+        "以下是工程師可直接修改的現場回報。未知欄位可以保持未提供；"
+        "Agent 後續仍會用 Tool 驗證，而不會把回報直接當成 Evidence。"
+    )
+    operator_note = st.text_area(
+        "異常描述",
+        value=selected_symptom,
+        placeholder="例如：ST-02 可以 ping，但數值已經三十分鐘沒有更新。",
+        help="這段內容會寫入 Incident 與 Raw Trace；目前不會由 NLP 自動解析。",
+    )
+    duration_minutes = st.number_input(
+        "已知持續時間（分鐘）",
+        min_value=0,
+        value=None,
+        step=1,
+        placeholder="未提供",
+        help="留空代表目前不知道，不會被當成 0 分鐘。",
+    )
+    status_columns = st.columns(3)
+    network_status = status_columns[0].selectbox(
+        "網路狀態",
+        options=tuple(NETWORK_STATUS_OPTIONS),
+    )
+    telemetry_status = status_columns[1].selectbox(
+        "Telemetry 狀態",
+        options=tuple(TELEMETRY_STATUS_OPTIONS),
+    )
+    peer_status = status_columns[2].selectbox(
+        "其他設備狀態",
+        options=tuple(PEER_STATUS_OPTIONS),
+    )
+
     raw_text = operator_note.strip() or selected_symptom
     intake = build_manual_intake(
         raw_text=raw_text,
         asset_id=incident.asset_id,
         symptom_type=SYMPTOM_TYPES[selected_symptom],
         known_asset_ids=selected.scenario.to_brief().known_asset_ids,
+        duration_minutes=(
+            int(duration_minutes) if duration_minutes is not None else None
+        ),
+        network_reachable=NETWORK_STATUS_OPTIONS[network_status],
+        telemetry_available=TELEMETRY_STATUS_OPTIONS[telemetry_status],
+        peer_affected=PEER_STATUS_OPTIONS[peer_status],
     )
-    st.markdown("#### 結構化 Incident Intake")
-    st.caption(
-        "目前解析來源是 manual：症狀與設備來自已選欄位；自由文字尚未由模型推論。"
-        "未來 Ollama 也必須輸出完全相同的 Schema。"
+    st.info(
+        f"確認摘要：設備 {intake.asset_id}｜症狀 {selected_symptom}｜"
+        f"描述：{intake.raw_text}"
     )
-    st.json(asdict(intake), expanded=False)
-    confirmation_fingerprint = hashlib.sha256(
-        f"{selected_id}|{selected_symptom}|{raw_text}".encode("utf-8")
-    ).hexdigest()[:16]
-    operator_confirmed = st.checkbox(
-        "我已確認上述結構化內容符合現場回報",
-        key=f"confirm_intake_{confirmation_fingerprint}",
-        help="修改症狀、批次或補充文字後，必須重新確認。",
-    )
-    if operator_confirmed:
-        st.success("Incident Intake 已由操作員確認，可以進入 Agent 調查流程。")
+    with st.expander("技術與稽核資料（JSON）"):
+        st.caption(
+            "這是系統交換格式，不需要工程師直接修改。未來 Ollama 也必須通過相同 Schema。"
+        )
+        st.json(asdict(intake), expanded=True)
 
     if st.button(
-        "執行調查 Run investigation",
+        "確認並執行調查 Confirm & run",
         type="primary",
         width="stretch",
         icon=":material/play_arrow:",
-        disabled=not operator_confirmed,
+        help="按下此按鈕即代表確認上方可編輯內容，並留下確認紀錄。",
     ):
         confirmed = confirm_intake(
             intake,

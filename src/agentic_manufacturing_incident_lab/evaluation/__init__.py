@@ -28,6 +28,10 @@ from agentic_manufacturing_incident_lab.evaluation.rendering import (
     render_benchmark_summary,
     render_benchmark_trace,
 )
+from agentic_manufacturing_incident_lab.evaluation.planner_comparison import (
+    PlannerComparisonRow,
+    run_planner_comparison,
+)
 
 __all__ = [
     "AgentOperationalMetrics",
@@ -36,6 +40,7 @@ __all__ = [
     "BenchmarkExpectation",
     "BenchmarkMetrics",
     "BenchmarkSummary",
+    "PlannerComparisonRow",
     "SpecialistFault",
     "build_controlled_benchmark_catalog",
     "build_phase7_benchmark_catalog",
@@ -47,4 +52,5 @@ __all__ = [
     "run_benchmark_case",
     "run_controlled_benchmark",
     "run_phase7_benchmark",
+    "run_planner_comparison",
 ]

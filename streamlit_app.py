@@ -9,6 +9,7 @@ from agentic_manufacturing_incident_lab.evaluation import (
     build_phase7_benchmark_catalog,
     run_benchmark_case,
     run_phase7_benchmark,
+    run_planner_comparison,
 )
 from agentic_manufacturing_incident_lab.presentation import (
     BenchmarkPresentation,
@@ -41,7 +42,7 @@ CASE_LABELS = {
 WORKBENCH_PAGE = "事件調查台 Incident Workbench"
 BENCHMARK_PAGE = "基準測試 Benchmark Dashboard"
 ABOUT_PAGE = "關於專案 About"
-APP_RELEASE = "Multi-source Manufacturing Diagnostics v1"
+APP_RELEASE = "Agent Evaluation & Planner A/B v1"
 
 
 def _metric_grid(metrics) -> None:
@@ -77,6 +78,7 @@ def _run_full_benchmark() -> None:
     with st.spinner("Running all controlled benchmark cases..."):
         summary = run_phase7_benchmark()
     st.session_state["benchmark_view"] = build_benchmark_presentation(summary)
+    st.session_state["planner_comparison"] = run_planner_comparison()
 
 
 def _current_benchmark_view() -> BenchmarkPresentation | None:
@@ -356,6 +358,27 @@ def _benchmark_dashboard() -> None:
             "handoffs": "Agent 交接",
             "failure": "故障類型",
             "passed": "是否通過",
+        },
+    )
+    st.subheader("Planner A/B 比較")
+    st.caption(
+        "在相同 Scenario 與 seed 下隔離執行 rule-based 與 hypothesis-driven Planner；"
+        "確認動作成本與結果一致，同時顯示假設解析程度。"
+    )
+    st.dataframe(
+        [asdict(row) for row in st.session_state["planner_comparison"]],
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "case": "案例 Case",
+            "rule_status": "Rule 狀態",
+            "hypothesis_status": "Hypothesis 狀態",
+            "rule_actions": "Rule Actions",
+            "hypothesis_actions": "Hypothesis Actions",
+            "action_delta": "Action 差值",
+            "same_tool_sequence": "工具順序相同",
+            "same_evidence": "Evidence 相同",
+            "hypothesis_resolution": "假設解析率",
         },
     )
     with st.expander("彙總文字 Aggregate summary"):

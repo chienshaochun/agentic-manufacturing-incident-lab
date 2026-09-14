@@ -3,6 +3,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from agentic_manufacturing_incident_lab.domain import (
+    HypothesisEffect,
+    HypothesisSignal,
     HypothesisStatus,
     Incident,
     IncidentSeverity,
@@ -101,11 +103,6 @@ def test_peer_failure_supports_shared_infrastructure_hypothesis() -> None:
 
 
 def test_conflicting_signal_for_same_observation_is_rejected() -> None:
-    from agentic_manufacturing_incident_lab.domain import (
-        HypothesisEffect,
-        HypothesisSignal,
-    )
-
     definitions = (HypothesisDefinition("HYP-001", "Candidate cause."),)
     signals = (
         HypothesisSignal("HYP-001", "OBS-001", HypothesisEffect.SUPPORTS, 0.5, "A"),
@@ -119,3 +116,61 @@ def test_conflicting_signal_for_same_observation_is_rejected() -> None:
             signals=signals,
             evaluated_at=NOW,
         )
+
+
+def test_low_quality_contradiction_does_not_prematurely_reject() -> None:
+    hypotheses = evaluate_hypotheses(
+        incident=_incident(),
+        definitions=(HypothesisDefinition("HYP-001", "Candidate cause."),),
+        signals=(
+            HypothesisSignal(
+                "HYP-001",
+                "OBS-LOW-QUALITY",
+                HypothesisEffect.CONTRADICTS,
+                1.0,
+                "A weak measurement contradicts the cause.",
+            ),
+        ),
+        observation_quality={"OBS-LOW-QUALITY": 0.5},
+        evaluated_at=NOW,
+    )
+
+    assert hypotheses[0].status is HypothesisStatus.INCONCLUSIVE
+    assert "contradiction_score=0.50" in hypotheses[0].rationale
+
+
+def test_strong_support_and_contradiction_become_conflicted() -> None:
+    hypotheses = evaluate_hypotheses(
+        incident=_incident(),
+        definitions=(HypothesisDefinition("HYP-001", "Candidate cause."),),
+        signals=(
+            HypothesisSignal(
+                "HYP-001", "OBS-SUPPORT", HypothesisEffect.SUPPORTS, 0.9, "A"
+            ),
+            HypothesisSignal(
+                "HYP-001", "OBS-CONTRADICT", HypothesisEffect.CONTRADICTS, 0.9, "B"
+            ),
+        ),
+        evaluated_at=NOW,
+    )
+
+    assert hypotheses[0].status is HypothesisStatus.CONFLICTED
+    assert hypotheses[0].supporting_observation_ids == ("OBS-SUPPORT",)
+    assert hypotheses[0].contradicting_observation_ids == ("OBS-CONTRADICT",)
+
+
+def test_zero_quality_signal_leaves_hypothesis_open() -> None:
+    hypotheses = evaluate_hypotheses(
+        incident=_incident(),
+        definitions=(HypothesisDefinition("HYP-001", "Candidate cause."),),
+        signals=(
+            HypothesisSignal(
+                "HYP-001", "OBS-UNUSABLE", HypothesisEffect.SUPPORTS, 1.0, "A"
+            ),
+        ),
+        observation_quality={"OBS-UNUSABLE": 0.0},
+        evaluated_at=NOW,
+    )
+
+    assert hypotheses[0].status is HypothesisStatus.OPEN
+    assert hypotheses[0].observation_ids == ()

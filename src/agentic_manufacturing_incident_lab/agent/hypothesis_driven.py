@@ -70,7 +70,11 @@ def score_probe(context: AgentContext, probe: DiagnosticProbe) -> ProbeScore:
     unresolved = tuple(
         item
         for item in context.hypotheses
-        if item.status in {HypothesisStatus.OPEN, HypothesisStatus.INCONCLUSIVE}
+        if item.status in {
+            HypothesisStatus.OPEN,
+            HypothesisStatus.INCONCLUSIVE,
+            HypothesisStatus.CONFLICTED,
+        }
     )
     distinguished = tuple(
         item

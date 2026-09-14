@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Protocol, runtime_checkable
+from typing import Mapping, Protocol, runtime_checkable
 
 from agentic_manufacturing_incident_lab.domain import (
     Hypothesis,
@@ -62,6 +62,8 @@ def evaluate_hypotheses(
     evaluated_at: datetime,
     support_threshold: float = 0.90,
     rejection_threshold: float = 0.65,
+    conflict_threshold: float = 0.65,
+    observation_quality: Mapping[str, float] | None = None,
 ) -> tuple[Hypothesis, ...]:
     """Aggregate auditable signals into immutable hypothesis snapshots."""
     require_timezone(evaluated_at, "evaluated_at")
@@ -69,6 +71,17 @@ def evaluate_hypotheses(
         raise ValueError("support_threshold must be in (0.0, 1.0]")
     if not 0.0 < rejection_threshold <= 1.0:
         raise ValueError("rejection_threshold must be in (0.0, 1.0]")
+    if not 0.0 < conflict_threshold <= 1.0:
+        raise ValueError("conflict_threshold must be in (0.0, 1.0]")
+    quality_by_id = dict(observation_quality or {})
+    for observation_id, quality in quality_by_id.items():
+        require_text(observation_id, "observation_quality observation_id")
+        if (
+            isinstance(quality, bool)
+            or not isinstance(quality, (int, float))
+            or not 0.0 <= quality <= 1.0
+        ):
+            raise ValueError("observation quality must be between 0.0 and 1.0")
 
     definition_ids = tuple(item.hypothesis_id for item in definitions)
     if not definitions:
@@ -88,25 +101,32 @@ def evaluate_hypotheses(
     snapshots = []
     for definition in definitions:
         related = tuple(
-            signal for signal in signals
+            (signal, signal.weight * quality_by_id.get(signal.observation_id, 1.0))
+            for signal in signals
             if signal.hypothesis_id == definition.hypothesis_id
+            and signal.weight * quality_by_id.get(signal.observation_id, 1.0) > 0.0
         )
         support_signals = tuple(
-            signal for signal in related
+            (signal, effective_weight) for signal, effective_weight in related
             if signal.effect is HypothesisEffect.SUPPORTS
         )
         contradiction_signals = tuple(
-            signal for signal in related
+            (signal, effective_weight) for signal, effective_weight in related
             if signal.effect is HypothesisEffect.CONTRADICTS
         )
-        support_score = min(1.0, sum(item.weight for item in support_signals))
+        support_score = min(1.0, sum(weight for _, weight in support_signals))
         contradiction_score = min(
             1.0,
-            sum(item.weight for item in contradiction_signals),
+            sum(weight for _, weight in contradiction_signals),
         )
 
         if not related:
             status = HypothesisStatus.OPEN
+        elif (
+            support_score >= conflict_threshold
+            and contradiction_score >= conflict_threshold
+        ):
+            status = HypothesisStatus.CONFLICTED
         elif contradiction_score >= rejection_threshold:
             status = HypothesisStatus.REJECTED
         elif support_score >= support_threshold and contradiction_score < 0.25:
@@ -131,17 +151,17 @@ def evaluate_hypotheses(
                 status=status,
                 confidence=confidence,
                 supporting_observation_ids=tuple(
-                    dict.fromkeys(item.observation_id for item in support_signals)
+                    dict.fromkeys(item.observation_id for item, _ in support_signals)
                 ),
                 contradicting_observation_ids=tuple(
                     dict.fromkeys(
-                        item.observation_id for item in contradiction_signals
+                        item.observation_id for item, _ in contradiction_signals
                     )
                 ),
                 rationale=(
                     f"support_score={support_score:.2f}; "
                     f"contradiction_score={contradiction_score:.2f}; "
-                    f"signals={len(related)}"
+                    f"quality_adjusted_signals={len(related)}"
                 ),
                 updated_at=evaluated_at,
             )
@@ -172,6 +192,9 @@ class ConnectivityHypothesisPolicy:
             definitions=definitions,
             signals=signals,
             evaluated_at=evaluated_at,
+            observation_quality={
+                item.observation_id: item.quality_factor for item in observations
+            },
         )
 
     @staticmethod
@@ -317,6 +340,9 @@ class ManufacturingSignalHypothesisPolicy:
             definitions=definitions,
             signals=signals,
             evaluated_at=evaluated_at,
+            observation_quality={
+                item.observation_id: item.quality_factor for item in observations
+            },
         )
 
     @staticmethod

@@ -134,12 +134,13 @@ def test_benchmark_dashboard_runs_all_controlled_cases() -> None:
     assert any("- 案例數： 13" in code.value for code in app.code)
 
 
-def test_about_page_explains_deterministic_no_llm_boundary() -> None:
+def test_about_page_explains_guarded_optional_llm_boundary() -> None:
     app = load_app()
 
     app.radio[0].set_value("關於專案 About").run()
 
     assert not app.exception
     assert app.title[0].value == "關於本實驗室"
-    assert "沒有使用 LLM" in app.markdown[0].value
+    assert "沒有呼叫 LLM 或外部 API" in app.markdown[0].value
+    assert "Structured LLM Planner adapter" in app.markdown[0].value
     assert "hypothesis-driven utility policy" in app.markdown[0].value

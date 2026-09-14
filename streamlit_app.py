@@ -394,8 +394,10 @@ def _about() -> None:
 合成情境、受限制工具、結構化 Handoff、獨立安全審查、Evidence-bound report
 與受控 Benchmark，讓每個決策都能被重播與稽核。
 
-目前 Planner 採用 deterministic hypothesis-driven utility policy，並保留rule-based baseline。專案**沒有使用 LLM、外部 API、
-真實生產設備或機密工廠資料**，因此畫面結果不代表真實產線準確率。
+目前 App 預設採用 deterministic hypothesis-driven utility policy，並保留 rule-based baseline。
+核心另提供 provider-neutral 的 Structured LLM Planner adapter，但公開 App **沒有呼叫 LLM 或外部 API**；
+模型只能提出結構化決策，Tool allowlist、參數、Evidence 與 fallback 仍由 deterministic runtime 控制。
+專案也不連接真實生產設備或使用機密工廠資料，因此畫面結果不代表真實產線準確率。
 """
     )
 
@@ -412,7 +414,7 @@ def main() -> None:
         (WORKBENCH_PAGE, BENCHMARK_PAGE, ABOUT_PAGE),
     )
     st.sidebar.caption(
-        "可重播 · 合成資料 · 只讀診斷 · 無 LLM"
+        "可重播 · 合成資料 · 只讀診斷 · 預設無 LLM"
     )
     st.sidebar.caption(f"介面版本：{APP_RELEASE}")
 

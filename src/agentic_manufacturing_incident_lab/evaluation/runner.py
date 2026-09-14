@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, replace
 
-from agentic_manufacturing_incident_lab.agent import RuleBasedPlanner
+from agentic_manufacturing_incident_lab.agent import HypothesisDrivenPlanner
 from agentic_manufacturing_incident_lab.collaboration import (
     CoordinatorAgent,
     DiagnosticAgent,
@@ -246,7 +246,7 @@ def run_benchmark_case(case: BenchmarkCase) -> BenchmarkCaseResult:
     environment = SimulatedEnvironment(case.scenario)
     brief = environment.brief
     diagnostic = DiagnosticAgent(
-        policy=RuleBasedPlanner(),
+        policy=HypothesisDrivenPlanner(),
         registry=build_diagnostic_registry(environment),
         action_limit=case.action_limit,
     )

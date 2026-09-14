@@ -10,6 +10,12 @@ from agentic_manufacturing_incident_lab.agent.contracts import (
     StopReason,
 )
 from agentic_manufacturing_incident_lab.agent.loop import SingleAgentRunner
+from agentic_manufacturing_incident_lab.agent.hypothesis_driven import (
+    DiagnosticProbe,
+    HypothesisDrivenPlanner,
+    ProbeScore,
+    score_probe,
+)
 from agentic_manufacturing_incident_lab.agent.memory import (
     MemoryFact,
     OpenQuestion,
@@ -27,10 +33,13 @@ __all__ = [
     "ActionDecision",
     "AgentContext",
     "CompleteDecision",
+    "DiagnosticProbe",
+    "HypothesisDrivenPlanner",
     "MemoryFact",
     "OpenQuestion",
     "PlanningDecision",
     "PlanningPolicy",
+    "ProbeScore",
     "RuleBasedPlanner",
     "SingleAgentRunner",
     "StepBudget",
@@ -42,4 +51,5 @@ __all__ = [
     "initialize_working_memory",
     "prepare_action_memory",
     "record_action_memory",
+    "score_probe",
 ]

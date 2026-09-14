@@ -28,6 +28,8 @@ _EXACT_TEXT = {
         "已建立單一 Agent 調查任務。",
     "Planning policy station_connectivity_rule_based_v1 started.":
         "規劃政策 station_connectivity_rule_based_v1 已啟動。",
+    "Planning policy station_hypothesis_utility_v1 started.":
+        "假設效用規劃政策 station_hypothesis_utility_v1 已啟動。",
     "The affected station is unreachable and has no telemetry while a peer station remains reachable.":
         "受影響工作站無法連線且沒有 Telemetry，但 Peer Station 仍可連線。",
     "Both the affected and peer stations are unreachable, so the evidence does not support an isolated-station conclusion.":

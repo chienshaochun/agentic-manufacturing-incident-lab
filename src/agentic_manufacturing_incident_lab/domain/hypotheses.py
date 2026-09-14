@@ -19,6 +19,7 @@ class HypothesisStatus(StrEnum):
     SUPPORTED = "supported"
     REJECTED = "rejected"
     INCONCLUSIVE = "inconclusive"
+    CONFLICTED = "conflicted"
 
 
 class HypothesisEffect(StrEnum):
@@ -84,6 +85,12 @@ class Hypothesis:
             raise ValueError("a supported hypothesis requires supporting observations")
         if self.status is HypothesisStatus.REJECTED and not contradicting_ids:
             raise ValueError("a rejected hypothesis requires contradicting observations")
+        if self.status is HypothesisStatus.CONFLICTED and (
+            not supporting_ids or not contradicting_ids
+        ):
+            raise ValueError(
+                "a conflicted hypothesis requires supporting and contradicting observations"
+            )
         require_timezone(self.updated_at, "updated_at")
         object.__setattr__(self, "supporting_observation_ids", supporting_ids)
         object.__setattr__(self, "contradicting_observation_ids", contradicting_ids)

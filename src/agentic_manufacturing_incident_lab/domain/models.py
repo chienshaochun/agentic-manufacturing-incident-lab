@@ -90,12 +90,32 @@ class Observation:
     summary: str
     observed_at: datetime
     values: Mapping[str, ScalarValue] = field(default_factory=dict)
+    source_reliability: float = 1.0
+    measurement_quality: float = 1.0
+    freshness: float = 1.0
 
     def __post_init__(self) -> None:
         for field_name in ("observation_id", "incident_id", "source", "summary"):
             require_text(getattr(self, field_name), field_name)
         require_timezone(self.observed_at, "observed_at")
+        for field_name in (
+            "source_reliability",
+            "measurement_quality",
+            "freshness",
+        ):
+            value = getattr(self, field_name)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not 0.0 <= value <= 1.0
+            ):
+                raise ValueError(f"{field_name} must be between 0.0 and 1.0")
         object.__setattr__(self, "values", MappingProxyType(dict(self.values)))
+
+    @property
+    def quality_factor(self) -> float:
+        """Return the combined trust multiplier used by hypothesis signals."""
+        return self.source_reliability * self.measurement_quality * self.freshness
 
 
 @dataclass(frozen=True, slots=True)

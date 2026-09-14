@@ -76,8 +76,8 @@ def test_serialization_is_deterministic_for_same_run() -> None:
 def test_checkpoint_schema_tracks_attempt_history_format() -> None:
     envelope = json.loads(serialize_checkpoint(run_agent()))
 
-    assert CHECKPOINT_SCHEMA_VERSION == 4
-    assert envelope["schema_version"] == 4
+    assert CHECKPOINT_SCHEMA_VERSION == 5
+    assert envelope["schema_version"] == 5
     assert "attempts" in envelope["run"]["executions"][0]
 
 

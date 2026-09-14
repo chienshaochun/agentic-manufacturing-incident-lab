@@ -50,7 +50,7 @@ Phase 16 的模型接入前置設計見 [結構化 Incident Intake](docs/PHASE_1
 
 ## 目前進度
 
-Phase 16 已完成：操作員可從 4 種可觀察症狀建立嚴格的結構化 Incident Intake，並直接修改描述、持續時間與設備狀態。JSON 僅收在稽核展開區；按下「確認並執行」才會建立確認紀錄並啟動 Agent。自由文字會進入 Incident 與 Raw Trace，但目前不宣稱已經過 NLP 理解；未來 Ollama 只能透過相同 Schema 插入。完整 benchmark 維持 16 個受控案例。
+Phase 16 已完成：操作員可從 4 種可觀察症狀建立嚴格的結構化 Incident Intake，並直接修改描述、持續時間與設備狀態。JSON 僅收在稽核展開區；按下「確認並執行」才會建立確認紀錄並啟動 Agent。調查結果預設使用精簡展示，只保留結論、關鍵檢查、最終假設與 Evidence；12 個指標、Handoff、Utility 和 Raw Trace 可切換至完整稽核模式。自由文字會進入 Incident 與 Raw Trace，但目前不宣稱已經過 NLP 理解。完整 benchmark 維持 16 個受控案例。
 
 ## 本機手動演練
 

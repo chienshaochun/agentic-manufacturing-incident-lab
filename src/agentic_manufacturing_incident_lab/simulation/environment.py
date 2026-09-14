@@ -63,6 +63,74 @@ class SimulatedEnvironment:
             values={"asset_id": asset.asset_id, "telemetry_available": available},
         )
 
+    def read_alarm_history(self, asset_id: str) -> Observation:
+        """Read the current synthetic alarm snapshot for one asset."""
+        asset = self._scenario.asset_truth(asset_id)
+        codes = ",".join(asset.alarm_codes)
+        return self._record_observation(
+            source="simulated_alarm_historian",
+            kind=ObservationKind.ALARM,
+            summary=f"Alarm history for {asset.asset_id}: {codes or 'none'}.",
+            values={
+                "asset_id": asset.asset_id,
+                "alarm_count": len(asset.alarm_codes),
+                "alarm_codes_csv": codes,
+            },
+        )
+
+    def inspect_configuration(self, asset_id: str) -> Observation:
+        """Compare actual and expected configuration versions."""
+        asset = self._scenario.asset_truth(asset_id)
+        matches = asset.configuration_version == asset.expected_configuration_version
+        return self._record_observation(
+            source="simulated_configuration_store",
+            kind=ObservationKind.CONFIGURATION,
+            summary=(
+                f"Configuration for {asset.asset_id} "
+                f"{'matches' if matches else 'differs from'} the expected version."
+            ),
+            values={
+                "asset_id": asset.asset_id,
+                "configuration_version": asset.configuration_version,
+                "expected_configuration_version": asset.expected_configuration_version,
+                "configuration_matches": matches,
+            },
+        )
+
+    def read_maintenance_record(self, asset_id: str) -> Observation:
+        """Read whether one asset is under planned maintenance."""
+        asset = self._scenario.asset_truth(asset_id)
+        return self._record_observation(
+            source="simulated_maintenance_system",
+            kind=ObservationKind.MAINTENANCE,
+            summary=(
+                f"Planned maintenance for {asset.asset_id} is "
+                f"{'active' if asset.maintenance_active else 'inactive'}."
+            ),
+            values={
+                "asset_id": asset.asset_id,
+                "maintenance_active": asset.maintenance_active,
+            },
+        )
+
+    def check_sensor_freshness(self, asset_id: str) -> Observation:
+        """Measure whether sensor values are still being refreshed."""
+        asset = self._scenario.asset_truth(asset_id)
+        return self._record_observation(
+            source="simulated_sensor_monitor",
+            kind=ObservationKind.METRIC,
+            summary=(
+                f"Sensor data for {asset.asset_id} is "
+                f"{'fresh' if asset.sensor_fresh else 'stale'} "
+                f"(age={asset.sensor_age_seconds}s)."
+            ),
+            values={
+                "asset_id": asset.asset_id,
+                "sensor_fresh": asset.sensor_fresh,
+                "sensor_age_seconds": asset.sensor_age_seconds,
+            },
+        )
+
     def _record_observation(
         self,
         *,

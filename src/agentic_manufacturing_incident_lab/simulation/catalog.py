@@ -158,3 +158,88 @@ def build_telemetry_path_scenario(seed: int = 91) -> ScenarioDefinition:
         faulted_asset_id=affected_station,
         root_cause_code="simulated_station_telemetry_path_failure",
     )
+
+
+def _build_flatline_scenario(*, seed: int, configuration_drift: bool) -> ScenarioDefinition:
+    if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+        raise ValueError("seed must be a non-negative integer")
+    station_ids = ("ST-01", "ST-02", "ST-03")
+    affected_station = station_ids[seed % len(station_ids)]
+    assets = tuple(
+        AssetTruth(
+            asset_id=station_id,
+            role=AssetRole.STATION,
+            network_reachable=True,
+            telemetry_available=True,
+            configuration_version=(
+                "recipe-2026.07"
+                if configuration_drift and station_id == affected_station
+                else "recipe-2026.08"
+            ),
+            expected_configuration_version="recipe-2026.08",
+            sensor_fresh=(
+                configuration_drift or station_id != affected_station
+            ),
+            sensor_age_seconds=(
+                0 if configuration_drift or station_id != affected_station else 1860
+            ),
+            maintenance_active=False,
+            alarm_codes=(
+                ("CONFIG_VERSION_MISMATCH", "PROCESS_SIGNAL_FLATLINE")
+                if configuration_drift and station_id == affected_station
+                else (
+                    ("SENSOR_STALE", "PROCESS_SIGNAL_FLATLINE")
+                    if station_id == affected_station
+                    else ()
+                )
+            ),
+        )
+        for station_id in station_ids
+    ) + (
+        AssetTruth(
+            asset_id="GW-01",
+            role=AssetRole.TELEMETRY_GATEWAY,
+            network_reachable=True,
+            telemetry_available=True,
+            configuration_version="gateway-2026.08",
+        ),
+    )
+    cause = "configuration-drift" if configuration_drift else "sensor-staleness"
+    incident = Incident(
+        incident_id=f"INC-SIGNAL-{seed:04d}",
+        title="Process signal stopped changing",
+        description=(
+            f"{affected_station} remains online, but its process value has been "
+            "flat for more than 30 minutes."
+        ),
+        asset_id=affected_station,
+        severity=IncidentSeverity.WARNING,
+        reported_at=datetime(2026, 8, 24, 12, 0, tzinfo=UTC),
+        goal=(
+            "Distinguish sensor staleness, configuration drift, planned maintenance, "
+            "and transport-path failures."
+        ),
+    )
+    return ScenarioDefinition(
+        scenario_id=f"manufacturing-signal-flatline-{cause}",
+        seed=seed,
+        title=f"Process signal flatline caused by {cause}",
+        incident=incident,
+        assets=assets,
+        faulted_asset_id=affected_station,
+        root_cause_code=(
+            "simulated_configuration_drift"
+            if configuration_drift
+            else "simulated_sensor_data_staleness"
+        ),
+    )
+
+
+def build_sensor_staleness_scenario(seed: int = 117) -> ScenarioDefinition:
+    """Build a flatline case caused by a stale sensor stream."""
+    return _build_flatline_scenario(seed=seed, configuration_drift=False)
+
+
+def build_configuration_drift_scenario(seed: int = 118) -> ScenarioDefinition:
+    """Build the same symptom with a mismatched recipe configuration."""
+    return _build_flatline_scenario(seed=seed, configuration_drift=True)

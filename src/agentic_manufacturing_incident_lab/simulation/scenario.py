@@ -23,17 +23,30 @@ class AssetTruth:
     network_reachable: bool
     telemetry_available: bool
     configuration_version: str
+    expected_configuration_version: str | None = None
+    sensor_fresh: bool = True
+    sensor_age_seconds: int = 0
+    maintenance_active: bool = False
     alarm_codes: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         require_text(self.asset_id, "asset_id")
         require_text(self.configuration_version, "configuration_version")
+        expected = self.expected_configuration_version or self.configuration_version
+        require_text(expected, "expected_configuration_version")
+        if (
+            isinstance(self.sensor_age_seconds, bool)
+            or not isinstance(self.sensor_age_seconds, int)
+            or self.sensor_age_seconds < 0
+        ):
+            raise ValueError("sensor_age_seconds must be a non-negative integer")
         alarm_codes = tuple(self.alarm_codes)
         for alarm_code in alarm_codes:
             require_text(alarm_code, "alarm_code")
         if len(set(alarm_codes)) != len(alarm_codes):
             raise ValueError("alarm_codes must not contain duplicates")
         object.__setattr__(self, "alarm_codes", alarm_codes)
+        object.__setattr__(self, "expected_configuration_version", expected)
 
 
 @dataclass(frozen=True, slots=True)

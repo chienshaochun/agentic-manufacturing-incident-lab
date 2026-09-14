@@ -198,6 +198,7 @@ def localize_trace(trace: str) -> str:
     replacements = (
         ("Benchmark trace:", "Benchmark 稽核軌跡："),
         ("Incident:", "事件："),
+        ("Reported context:", "操作員確認的事件內容："),
         ("Scenario:", "情境："),
         ("Workflow status:", "工作流狀態："),
         ("Handoffs:", "Agent 交接："),

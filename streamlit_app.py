@@ -1,10 +1,12 @@
 """Interactive Streamlit workbench for the controlled incident lab."""
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
+import hashlib
 
 import streamlit as st
 
 from agentic_manufacturing_incident_lab.evaluation import (
+    BenchmarkCase,
     BenchmarkCaseResult,
     build_benchmark_catalog,
     run_benchmark_case,
@@ -20,6 +22,12 @@ from agentic_manufacturing_incident_lab.presentation import (
     build_case_presentation,
     case_json,
     case_report_markdown,
+)
+from agentic_manufacturing_incident_lab.intake import (
+    ConfirmedIncidentIntake,
+    SymptomType,
+    build_manual_intake,
+    confirm_intake,
 )
 
 
@@ -61,6 +69,13 @@ SYMPTOM_CASES = {
         "low-quality-configuration-evidence-seed-120",
         "multiple-supported-causes-seed-121",
     ),
+}
+
+SYMPTOM_TYPES = {
+    "單一設備無法連線": SymptomType.STATION_UNREACHABLE,
+    "多台設備同時無法連線": SymptomType.MULTI_STATION_UNREACHABLE,
+    "設備可連線，但 Telemetry 沒有更新": SymptomType.TELEMETRY_MISSING,
+    "設備在線，但製程數值持續平線": SymptomType.PROCESS_SIGNAL_FLATLINE,
 }
 
 SIMULATION_BATCH_LABELS = {
@@ -105,11 +120,36 @@ def _case_lookup():
     return {case.case_id: case for case in build_benchmark_catalog()}
 
 
-def _run_selected_case(case_id: str) -> None:
+def _case_with_confirmed_intake(
+    case_id: str,
+    confirmed: ConfirmedIncidentIntake,
+) -> BenchmarkCase:
     case = _case_lookup()[case_id]
+    incident = case.scenario.incident
+    if confirmed.intake.asset_id != incident.asset_id:
+        raise ValueError("confirmed intake asset must match the selected simulation")
+    updated_incident = replace(
+        incident,
+        description=(
+            f"{incident.description} "
+            f"Operator-confirmed report: {confirmed.intake.raw_text}"
+        ),
+    )
+    return replace(
+        case,
+        scenario=replace(case.scenario, incident=updated_incident),
+    )
+
+
+def _run_selected_case(
+    case_id: str,
+    confirmed: ConfirmedIncidentIntake,
+) -> None:
+    case = _case_with_confirmed_intake(case_id, confirmed)
     with st.spinner("Running deterministic multi-agent investigation..."):
         result = run_benchmark_case(case)
     st.session_state["case_result"] = result
+    st.session_state["confirmed_intake"] = confirmed
 
 
 def _current_case_result(case_id: str) -> BenchmarkCaseResult | None:
@@ -408,7 +448,7 @@ def _incident_workbench() -> None:
     operator_note = st.text_area(
         "操作員補充現象 Operator note（選填）",
         placeholder="例如：同區另一台設備正常、問題在換班後開始出現……",
-        help="目前版本保留這段文字供展示，尚未使用 NLP 解析自由文字。",
+        help="Ollama 尚未啟用；目前由下拉欄位建立結構化內容，文字會保存在 Incident。",
     )
     selected = cases[selected_id]
     incident = selected.scenario.incident
@@ -431,13 +471,43 @@ def _incident_workbench() -> None:
             "Evaluator 才使用 answer key 驗證結果。"
         )
 
+    raw_text = operator_note.strip() or selected_symptom
+    intake = build_manual_intake(
+        raw_text=raw_text,
+        asset_id=incident.asset_id,
+        symptom_type=SYMPTOM_TYPES[selected_symptom],
+        known_asset_ids=selected.scenario.to_brief().known_asset_ids,
+    )
+    st.markdown("#### 結構化 Incident Intake")
+    st.caption(
+        "目前解析來源是 manual：症狀與設備來自已選欄位；自由文字尚未由模型推論。"
+        "未來 Ollama 也必須輸出完全相同的 Schema。"
+    )
+    st.json(asdict(intake), expanded=False)
+    confirmation_fingerprint = hashlib.sha256(
+        f"{selected_id}|{selected_symptom}|{raw_text}".encode("utf-8")
+    ).hexdigest()[:16]
+    operator_confirmed = st.checkbox(
+        "我已確認上述結構化內容符合現場回報",
+        key=f"confirm_intake_{confirmation_fingerprint}",
+        help="修改症狀、批次或補充文字後，必須重新確認。",
+    )
+    if operator_confirmed:
+        st.success("Incident Intake 已由操作員確認，可以進入 Agent 調查流程。")
+
     if st.button(
         "執行調查 Run investigation",
         type="primary",
         width="stretch",
         icon=":material/play_arrow:",
+        disabled=not operator_confirmed,
     ):
-        _run_selected_case(selected_id)
+        confirmed = confirm_intake(
+            intake,
+            confirmed_by="streamlit_operator",
+            confirmed_at=incident.reported_at,
+        )
+        _run_selected_case(selected_id, confirmed)
 
     result = _current_case_result(selected_id)
     if result is None:

@@ -100,6 +100,12 @@ def render_benchmark_trace(result: BenchmarkCaseResult) -> str:
     lines = [
         f"Benchmark trace: {result.case_id}",
         f"Incident: {expectation.incident_id}",
+        "Reported context: "
+        + (
+            run.diagnostic.run.incident.description
+            if run.diagnostic is not None
+            else "unavailable because DiagnosticAgent returned no work product"
+        ),
         f"Scenario: {expectation.scenario_id} | seed={expectation.seed}",
         f"Workflow status: {run.status.value}",
         "",

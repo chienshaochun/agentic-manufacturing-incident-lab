@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from typing import Mapping, Protocol, runtime_checkable
 
-from agentic_manufacturing_incident_lab.domain._validation import require_text
+from agentic_manufacturing_incident_lab.domain._validation import (
+    require_text,
+    require_timezone,
+)
 
 
 class SymptomType(StrEnum):
@@ -67,6 +71,35 @@ class IncidentIntake:
             or not 0.0 <= self.parse_confidence <= 1.0
         ):
             raise ValueError("parse_confidence must be between 0.0 and 1.0")
+
+
+@dataclass(frozen=True, slots=True)
+class ConfirmedIncidentIntake:
+    """Operator-approved intake that may cross into incident orchestration."""
+
+    intake: IncidentIntake
+    confirmed_by: str
+    confirmed_at: datetime
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.intake, IncidentIntake):
+            raise ValueError("intake must be an IncidentIntake")
+        require_text(self.confirmed_by, "confirmed_by")
+        require_timezone(self.confirmed_at, "confirmed_at")
+
+
+def confirm_intake(
+    intake: IncidentIntake,
+    *,
+    confirmed_by: str,
+    confirmed_at: datetime,
+) -> ConfirmedIncidentIntake:
+    """Create the explicit human gate required before orchestration."""
+    return ConfirmedIncidentIntake(
+        intake=intake,
+        confirmed_by=confirmed_by,
+        confirmed_at=confirmed_at,
+    )
 
 
 @runtime_checkable

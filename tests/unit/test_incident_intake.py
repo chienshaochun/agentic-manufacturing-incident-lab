@@ -1,4 +1,5 @@
 from dataclasses import replace
+from datetime import UTC, datetime
 
 import pytest
 
@@ -7,6 +8,7 @@ from agentic_manufacturing_incident_lab.intake import (
     IntakeSource,
     SymptomType,
     build_manual_intake,
+    confirm_intake,
     incident_intake_json_schema,
     intake_from_payload,
 )
@@ -116,6 +118,26 @@ def test_manual_fallback_uses_same_contract_without_claiming_nlp() -> None:
     assert intake.parser_name == "manual_structured_input_v1"
     assert intake.parse_confidence == 1.0
     assert intake.network_reachable is None
+
+
+def test_confirmed_intake_records_explicit_human_gate() -> None:
+    intake = build_manual_intake(
+        raw_text="ST-01 無法連線",
+        asset_id="ST-01",
+        symptom_type=SymptomType.STATION_UNREACHABLE,
+        known_asset_ids=KNOWN_ASSETS,
+    )
+    confirmed_at = datetime(2026, 9, 14, 10, 0, tzinfo=UTC)
+
+    confirmed = confirm_intake(
+        intake,
+        confirmed_by="streamlit_operator",
+        confirmed_at=confirmed_at,
+    )
+
+    assert confirmed.intake is intake
+    assert confirmed.confirmed_by == "streamlit_operator"
+    assert confirmed.confirmed_at == confirmed_at
 
 
 def test_protocol_accepts_future_parser_shape() -> None:

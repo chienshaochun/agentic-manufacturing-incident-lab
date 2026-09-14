@@ -72,4 +72,4 @@ Alarm 與 configuration store 都指向設定漂移，但 configuration store �
 - 品質係數與門檻目前是工程規則，不是由真實廠區資料校準。
 - 目前只在模擬情境中指定來源品質，尚未接收真實 sensor health、校正紀錄或資料延遲。
 - 多重原因目前選擇安全停止，尚未建立複合故障的 Evidence 與處置模型。
-- UI 尚未完整呈現每一步 Hypothesis 如何由 `open` 演化至最終狀態；此項留待 Phase 15。
+- 品質門檻尚未由真實產線資料校準；Phase 15 已補上每一步 Hypothesis 演化的 UI 與稽核軌跡。

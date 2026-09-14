@@ -48,7 +48,7 @@ def test_app_loads_incident_workbench_without_running_case() -> None:
     assert app.button[0].label == "執行調查 Run investigation"
     assert any("請選擇症狀與模擬批次" in info.value for info in app.info)
     assert any("answer key 在調查期間對 Agent 隱藏" in caption.value for caption in app.caption)
-    assert any("介面版本：Evidence Quality & Uncertainty v1" in caption.value for caption in app.caption)
+    assert any("介面版本：Investigation Reasoning UX v1" in caption.value for caption in app.caption)
 
 
 def test_run_button_executes_default_case_and_displays_metrics() -> None:

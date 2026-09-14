@@ -1,0 +1,294 @@
+"""Deterministic hypothesis scoring over collected observations."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Protocol, runtime_checkable
+
+from agentic_manufacturing_incident_lab.domain import (
+    Hypothesis,
+    HypothesisEffect,
+    HypothesisSignal,
+    HypothesisStatus,
+    Incident,
+    Observation,
+)
+from agentic_manufacturing_incident_lab.domain._validation import (
+    require_text,
+    require_timezone,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class HypothesisDefinition:
+    """Stable identity, statement, and prior for one candidate cause."""
+
+    hypothesis_id: str
+    statement: str
+    prior_confidence: float = 0.25
+
+    def __post_init__(self) -> None:
+        require_text(self.hypothesis_id, "hypothesis_id")
+        require_text(self.statement, "statement")
+        if (
+            isinstance(self.prior_confidence, bool)
+            or not 0.0 <= self.prior_confidence <= 1.0
+        ):
+            raise ValueError("prior_confidence must be between 0.0 and 1.0")
+
+
+@runtime_checkable
+class HypothesisPolicy(Protocol):
+    """Interchangeable policy that projects observations into hypotheses."""
+
+    name: str
+
+    def evaluate(
+        self,
+        incident: Incident,
+        observations: tuple[Observation, ...],
+        *,
+        evaluated_at: datetime,
+    ) -> tuple[Hypothesis, ...]:
+        """Return the current candidate explanations for an investigation."""
+
+
+def evaluate_hypotheses(
+    *,
+    incident: Incident,
+    definitions: tuple[HypothesisDefinition, ...],
+    signals: tuple[HypothesisSignal, ...],
+    evaluated_at: datetime,
+    support_threshold: float = 0.90,
+    rejection_threshold: float = 0.65,
+) -> tuple[Hypothesis, ...]:
+    """Aggregate auditable signals into immutable hypothesis snapshots."""
+    require_timezone(evaluated_at, "evaluated_at")
+    if not 0.0 < support_threshold <= 1.0:
+        raise ValueError("support_threshold must be in (0.0, 1.0]")
+    if not 0.0 < rejection_threshold <= 1.0:
+        raise ValueError("rejection_threshold must be in (0.0, 1.0]")
+
+    definition_ids = tuple(item.hypothesis_id for item in definitions)
+    if not definitions:
+        raise ValueError("definitions must not be empty")
+    if len(set(definition_ids)) != len(definition_ids):
+        raise ValueError("definitions must have unique hypothesis_id values")
+    if any(signal.hypothesis_id not in set(definition_ids) for signal in signals):
+        raise ValueError("signals must reference a known hypothesis")
+
+    pair_effects: dict[tuple[str, str], HypothesisEffect] = {}
+    for signal in signals:
+        pair = (signal.hypothesis_id, signal.observation_id)
+        previous = pair_effects.setdefault(pair, signal.effect)
+        if previous is not signal.effect:
+            raise ValueError("one observation cannot produce conflicting signals")
+
+    snapshots = []
+    for definition in definitions:
+        related = tuple(
+            signal for signal in signals
+            if signal.hypothesis_id == definition.hypothesis_id
+        )
+        support_signals = tuple(
+            signal for signal in related
+            if signal.effect is HypothesisEffect.SUPPORTS
+        )
+        contradiction_signals = tuple(
+            signal for signal in related
+            if signal.effect is HypothesisEffect.CONTRADICTS
+        )
+        support_score = min(1.0, sum(item.weight for item in support_signals))
+        contradiction_score = min(
+            1.0,
+            sum(item.weight for item in contradiction_signals),
+        )
+
+        if not related:
+            status = HypothesisStatus.OPEN
+        elif contradiction_score >= rejection_threshold:
+            status = HypothesisStatus.REJECTED
+        elif support_score >= support_threshold and contradiction_score < 0.25:
+            status = HypothesisStatus.SUPPORTED
+        else:
+            status = HypothesisStatus.INCONCLUSIVE
+
+        confidence = max(
+            0.0,
+            min(
+                0.99,
+                definition.prior_confidence
+                + 0.70 * support_score
+                - 0.70 * contradiction_score,
+            ),
+        )
+        snapshots.append(
+            Hypothesis(
+                hypothesis_id=definition.hypothesis_id,
+                incident_id=incident.incident_id,
+                statement=definition.statement,
+                status=status,
+                confidence=confidence,
+                supporting_observation_ids=tuple(
+                    dict.fromkeys(item.observation_id for item in support_signals)
+                ),
+                contradicting_observation_ids=tuple(
+                    dict.fromkeys(
+                        item.observation_id for item in contradiction_signals
+                    )
+                ),
+                rationale=(
+                    f"support_score={support_score:.2f}; "
+                    f"contradiction_score={contradiction_score:.2f}; "
+                    f"signals={len(related)}"
+                ),
+                updated_at=evaluated_at,
+            )
+        )
+    return tuple(snapshots)
+
+
+class ConnectivityHypothesisPolicy:
+    """Maintain competing station, shared-network, and telemetry hypotheses."""
+
+    name = "station_connectivity_hypotheses_v1"
+
+    def evaluate(
+        self,
+        incident: Incident,
+        observations: tuple[Observation, ...],
+        *,
+        evaluated_at: datetime,
+    ) -> tuple[Hypothesis, ...]:
+        definitions = self._definitions(incident)
+        signals = tuple(
+            signal
+            for observation in observations
+            for signal in self._signals(incident, observation, definitions)
+        )
+        return evaluate_hypotheses(
+            incident=incident,
+            definitions=definitions,
+            signals=signals,
+            evaluated_at=evaluated_at,
+        )
+
+    @staticmethod
+    def _definitions(incident: Incident) -> tuple[HypothesisDefinition, ...]:
+        prefix = f"HYP-{incident.incident_id}"
+        asset_id = incident.asset_id
+        return (
+            HypothesisDefinition(
+                hypothesis_id=f"{prefix}-STATION",
+                statement=f"The connectivity fault is isolated to {asset_id}.",
+            ),
+            HypothesisDefinition(
+                hypothesis_id=f"{prefix}-SHARED",
+                statement="Shared network infrastructure is unavailable.",
+            ),
+            HypothesisDefinition(
+                hypothesis_id=f"{prefix}-TELEMETRY",
+                statement=f"The telemetry path for {asset_id} is unavailable.",
+            ),
+        )
+
+    @classmethod
+    def _signals(
+        cls,
+        incident: Incident,
+        observation: Observation,
+        definitions: tuple[HypothesisDefinition, ...],
+    ) -> tuple[HypothesisSignal, ...]:
+        hypothesis_ids = {
+            "station": definitions[0].hypothesis_id,
+            "shared": definitions[1].hypothesis_id,
+            "telemetry": definitions[2].hypothesis_id,
+        }
+        asset_id = observation.values.get("asset_id")
+        signals: list[HypothesisSignal] = []
+        reachable = observation.values.get("network_reachable")
+        if isinstance(reachable, bool):
+            affected = asset_id == incident.asset_id
+            if affected and not reachable:
+                signals.extend(
+                    (
+                        cls._signal(hypothesis_ids["station"], observation, True, 0.35,
+                                    "The affected station is unreachable."),
+                        cls._signal(hypothesis_ids["shared"], observation, True, 0.50,
+                                    "An unreachable affected station may reflect shared infrastructure."),
+                        cls._signal(hypothesis_ids["telemetry"], observation, False, 0.35,
+                                    "Network loss prevents isolating a telemetry-only fault."),
+                    )
+                )
+            elif affected and reachable:
+                signals.extend(
+                    (
+                        cls._signal(hypothesis_ids["station"], observation, False, 1.00,
+                                    "The affected station is reachable."),
+                        cls._signal(hypothesis_ids["shared"], observation, False, 1.00,
+                                    "The affected station is reachable through shared infrastructure."),
+                        cls._signal(hypothesis_ids["telemetry"], observation, True, 0.35,
+                                    "Healthy connectivity keeps a telemetry-path fault plausible."),
+                    )
+                )
+            elif not affected and not reachable:
+                signals.extend(
+                    (
+                        cls._signal(hypothesis_ids["station"], observation, False, 0.75,
+                                    "A peer station is also unreachable."),
+                        cls._signal(hypothesis_ids["shared"], observation, True, 0.50,
+                                    "A peer station is also unreachable."),
+                    )
+                )
+            elif not affected and reachable:
+                signals.extend(
+                    (
+                        cls._signal(hypothesis_ids["station"], observation, True, 0.40,
+                                    "A peer station remains reachable."),
+                        cls._signal(hypothesis_ids["shared"], observation, False, 0.75,
+                                    "A reachable peer contradicts shared network loss."),
+                    )
+                )
+
+        telemetry_available = observation.values.get("telemetry_available")
+        if asset_id == incident.asset_id and isinstance(telemetry_available, bool):
+            if telemetry_available:
+                signals.extend(
+                    (
+                        cls._signal(hypothesis_ids["station"], observation, False, 0.35,
+                                    "The affected station still publishes telemetry."),
+                        cls._signal(hypothesis_ids["telemetry"], observation, False, 1.00,
+                                    "Telemetry is available."),
+                    )
+                )
+            else:
+                signals.extend(
+                    (
+                        cls._signal(hypothesis_ids["station"], observation, True, 0.25,
+                                    "The affected station has no telemetry."),
+                        cls._signal(hypothesis_ids["telemetry"], observation, True, 0.65,
+                                    "The affected station has no telemetry."),
+                    )
+                )
+        return tuple(signals)
+
+    @staticmethod
+    def _signal(
+        hypothesis_id: str,
+        observation: Observation,
+        supports: bool,
+        weight: float,
+        rationale: str,
+    ) -> HypothesisSignal:
+        return HypothesisSignal(
+            hypothesis_id=hypothesis_id,
+            observation_id=observation.observation_id,
+            effect=(
+                HypothesisEffect.SUPPORTS
+                if supports
+                else HypothesisEffect.CONTRADICTS
+            ),
+            weight=weight,
+            rationale=rationale,
+        )

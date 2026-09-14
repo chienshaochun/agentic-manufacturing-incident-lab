@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from agentic_manufacturing_incident_lab.domain.models import Evidence, Incident, Observation
+from agentic_manufacturing_incident_lab.domain.hypotheses import Hypothesis
 from agentic_manufacturing_incident_lab.domain.task import TaskState, TaskStatus
 from agentic_manufacturing_incident_lab.runtime.executor import ActionExecutionRecord
 
@@ -27,6 +28,7 @@ class InvestigationRun:
     task_states: tuple[TaskState, ...]
     executions: tuple[ActionExecutionRecord, ...] = ()
     evidence: tuple[Evidence, ...] = ()
+    hypotheses: tuple[Hypothesis, ...] = ()
     memory_states: tuple[WorkingMemory, ...] = ()
     safety_assessments: tuple[SafetyAssessment, ...] = ()
     approval_requests: tuple[ApprovalRequest, ...] = ()
@@ -37,6 +39,7 @@ class InvestigationRun:
         task_states = tuple(self.task_states)
         executions = tuple(self.executions)
         evidence = tuple(self.evidence)
+        hypotheses = tuple(self.hypotheses)
         memory_states = tuple(self.memory_states)
         safety_assessments = tuple(self.safety_assessments)
         approval_requests = tuple(self.approval_requests)
@@ -118,6 +121,16 @@ class InvestigationRun:
             for item in evidence
         ):
             raise ValueError("evidence may only reference observations in the run")
+        hypothesis_ids = tuple(item.hypothesis_id for item in hypotheses)
+        if len(set(hypothesis_ids)) != len(hypothesis_ids):
+            raise ValueError("run hypotheses must have unique hypothesis_id values")
+        if any(item.incident_id != self.incident.incident_id for item in hypotheses):
+            raise ValueError("all hypotheses must match the run incident")
+        if any(
+            not set(item.observation_ids).issubset(known_observation_ids)
+            for item in hypotheses
+        ):
+            raise ValueError("hypotheses may only reference observations in the run")
 
         if memory_states:
             task_id = task_states[0].task_id
@@ -233,6 +246,7 @@ class InvestigationRun:
         object.__setattr__(self, "task_states", task_states)
         object.__setattr__(self, "executions", executions)
         object.__setattr__(self, "evidence", evidence)
+        object.__setattr__(self, "hypotheses", hypotheses)
         object.__setattr__(self, "memory_states", memory_states)
         object.__setattr__(self, "safety_assessments", safety_assessments)
         object.__setattr__(self, "approval_requests", approval_requests)

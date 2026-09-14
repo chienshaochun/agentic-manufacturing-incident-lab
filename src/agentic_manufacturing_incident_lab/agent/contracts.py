@@ -11,6 +11,7 @@ from agentic_manufacturing_incident_lab.domain.models import (
     Observation,
     ScalarValue,
 )
+from agentic_manufacturing_incident_lab.domain.hypotheses import Hypothesis
 from agentic_manufacturing_incident_lab.domain.task import TaskState, TaskStatus
 from agentic_manufacturing_incident_lab.agent.memory import WorkingMemory
 from agentic_manufacturing_incident_lab.runtime import ActionExecutionRecord
@@ -27,11 +28,13 @@ class AgentContext:
     available_tools: tuple[ToolSpec, ...]
     working_memory: WorkingMemory
     executions: tuple[ActionExecutionRecord, ...] = ()
+    hypotheses: tuple[Hypothesis, ...] = ()
 
     def __post_init__(self) -> None:
         known_asset_ids = tuple(self.known_asset_ids)
         available_tools = tuple(self.available_tools)
         executions = tuple(self.executions)
+        hypotheses = tuple(self.hypotheses)
         if not known_asset_ids:
             raise ValueError("known_asset_ids must contain at least one asset")
         for asset_id in known_asset_ids:
@@ -70,10 +73,21 @@ class AgentContext:
             known_observation_ids
         ):
             raise ValueError("working memory may only reference context observations")
+        hypothesis_ids = tuple(item.hypothesis_id for item in hypotheses)
+        if len(set(hypothesis_ids)) != len(hypothesis_ids):
+            raise ValueError("context hypotheses must have unique hypothesis_id values")
+        if any(item.incident_id != self.incident.incident_id for item in hypotheses):
+            raise ValueError("all hypotheses must match the context incident")
+        if any(
+            not set(item.observation_ids).issubset(known_observation_ids)
+            for item in hypotheses
+        ):
+            raise ValueError("hypotheses may only reference context observations")
 
         object.__setattr__(self, "known_asset_ids", known_asset_ids)
         object.__setattr__(self, "available_tools", available_tools)
         object.__setattr__(self, "executions", executions)
+        object.__setattr__(self, "hypotheses", hypotheses)
 
     @property
     def observations(self) -> tuple[Observation, ...]:

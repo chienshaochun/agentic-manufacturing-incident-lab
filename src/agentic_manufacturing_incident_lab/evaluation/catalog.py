@@ -238,6 +238,8 @@ def _uncertain_manufacturing_case(
             max_handoffs=4,
         ),
     )
+
+
 def build_controlled_benchmark_catalog() -> tuple[BenchmarkCase, ...]:
     """Return deterministic success, ambiguity, and safe-stop cases."""
     cases = (

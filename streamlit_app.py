@@ -42,6 +42,29 @@ CASE_LABELS = {
     "contradictory-approval-seed-43": "安全核准矛盾｜Contradictory approval",
 }
 
+SYMPTOM_CASES = {
+    "設備無法連線或遙測中斷": (
+        "isolated-station-seed-43",
+        "shared-infrastructure-seed-73",
+        "telemetry-path-seed-91",
+        "isolated-station-seed-42",
+        "isolated-station-seed-44",
+    ),
+    "製程數值持續平線": (
+        "sensor-staleness-seed-117",
+        "configuration-drift-seed-118",
+        "conflicting-sensor-evidence-seed-119",
+        "low-quality-configuration-evidence-seed-120",
+        "multiple-supported-causes-seed-121",
+    ),
+}
+
+SIMULATION_BATCH_LABELS = {
+    case_id: f"模擬批次 {chr(65 + index)}｜固定資料，可重播"
+    for case_ids in SYMPTOM_CASES.values()
+    for index, case_id in enumerate(case_ids)
+}
+
 WORKBENCH_PAGE = "事件調查台 Incident Workbench"
 BENCHMARK_PAGE = "基準測試 Benchmark Dashboard"
 ABOUT_PAGE = "關於專案 About"
@@ -276,18 +299,26 @@ def _render_case_details(view: CasePresentation) -> None:
 def _incident_workbench() -> None:
     st.title("製造事件調查台")
     st.caption(
-        "將一個受控 Incident 依序交給 Coordinator、Diagnostic Agent、"
-        "Safety Reviewer 與 Reporter Agent 調查。"
+        "操作員只輸入可觀察的症狀；隱藏原因由模擬環境保存，"
+        "不會預先交給 Diagnostic Agent。"
     )
     cases = _case_lookup()
-    case_ids = tuple(cases)
-    default_index = case_ids.index("isolated-station-seed-43")
+    selected_symptom = st.selectbox(
+        "回報症狀 Observed symptom",
+        options=tuple(SYMPTOM_CASES),
+        help="這是現場人員實際看得到的異常範圍，不是 Root Cause。",
+    )
+    case_ids = SYMPTOM_CASES[selected_symptom]
     selected_id = st.selectbox(
-        "選擇受控案例 Benchmark case",
+        "選擇可重播模擬批次 Simulation batch",
         options=case_ids,
-        index=default_index,
-        format_func=lambda case_id: CASE_LABELS[case_id],
-        help="每個案例都將可重播情境綁定到明確的安全預期結果。",
+        format_func=lambda case_id: SIMULATION_BATCH_LABELS[case_id],
+        help="批次只用來固定模擬世界；標籤不會透露隱藏故障原因。",
+    )
+    operator_note = st.text_area(
+        "操作員補充現象 Operator note（選填）",
+        placeholder="例如：同區另一台設備正常、問題在換班後開始出現……",
+        help="目前版本保留這段文字供展示，尚未使用 NLP 解析自由文字。",
     )
     selected = cases[selected_id]
     incident = selected.scenario.incident
@@ -297,11 +328,18 @@ def _incident_workbench() -> None:
         f"**嚴重度 Severity：** `{incident.severity.value}`"
     )
     st.markdown(f"**調查目標 Goal：** {incident.goal}")
+    if operator_note.strip():
+        st.markdown(f"**操作員補充：** {operator_note.strip()}")
     st.caption(
-        f"情境 Scenario：{selected.scenario.scenario_id} · seed={selected.scenario.seed} "
-        f"· Action 上限={selected.action_limit} · 故障注入="
-        f"{selected.specialist_fault.value}"
+        f"模擬批次 seed={selected.scenario.seed} · Action 上限={selected.action_limit}。"
+        "Root Cause 與 Benchmark answer key 在調查期間對 Agent 隱藏。"
     )
+    with st.expander("為什麼還需要模擬批次？"):
+        st.write(
+            "本專案沒有連接真實機台，因此批次負責提供可重播的隱藏環境。"
+            "Diagnostic Agent 只能透過 Tool 讀取 Observation；調查結束後，"
+            "Evaluator 才使用 answer key 驗證結果。"
+        )
 
     if st.button(
         "執行調查 Run investigation",
@@ -313,7 +351,7 @@ def _incident_workbench() -> None:
 
     result = _current_case_result(selected_id)
     if result is None:
-        st.info("請選擇案例並執行調查，畫面才會顯示該次結果。")
+        st.info("請選擇症狀與模擬批次並執行調查，畫面才會顯示該次結果。")
         return
     _render_case_details(build_case_presentation(result))
 

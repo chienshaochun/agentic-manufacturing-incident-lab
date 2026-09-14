@@ -43,6 +43,17 @@ class EvidenceView:
 
 
 @dataclass(frozen=True, slots=True)
+class HypothesisView:
+    hypothesis_id: str
+    statement: str
+    status: str
+    confidence: float
+    supporting_observation_ids: str
+    contradicting_observation_ids: str
+    rationale: str
+
+
+@dataclass(frozen=True, slots=True)
 class SafetyView:
     outcome: str
     rationale: str
@@ -80,6 +91,7 @@ class CasePresentation:
     metrics: tuple[MetricCard, ...]
     handoffs: tuple[HandoffView, ...]
     action_attempts: tuple[ActionAttemptView, ...]
+    hypotheses: tuple[HypothesisView, ...]
     evidence: tuple[EvidenceView, ...]
     safety: SafetyView | None
     report: ReportView | None

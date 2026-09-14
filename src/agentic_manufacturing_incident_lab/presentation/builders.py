@@ -14,6 +14,7 @@ from agentic_manufacturing_incident_lab.presentation.models import (
     EvidenceView,
     FailureView,
     HandoffView,
+    HypothesisView,
     MetricCard,
     ReportView,
     SafetyView,
@@ -146,6 +147,27 @@ def _evidence(result: BenchmarkCaseResult) -> tuple[EvidenceView, ...]:
     )
 
 
+def _hypotheses(result: BenchmarkCaseResult) -> tuple[HypothesisView, ...]:
+    if result.run.diagnostic is None:
+        return ()
+    return tuple(
+        HypothesisView(
+            hypothesis_id=hypothesis.hypothesis_id,
+            statement=localize_text(hypothesis.statement),
+            status=hypothesis.status.value,
+            confidence=hypothesis.confidence,
+            supporting_observation_ids=", ".join(
+                hypothesis.supporting_observation_ids
+            ),
+            contradicting_observation_ids=", ".join(
+                hypothesis.contradicting_observation_ids
+            ),
+            rationale=hypothesis.rationale,
+        )
+        for hypothesis in result.run.diagnostic.run.hypotheses
+    )
+
+
 def _safety(result: BenchmarkCaseResult) -> SafetyView | None:
     if result.run.safety_review is None:
         return None
@@ -202,6 +224,7 @@ def build_case_presentation(result: BenchmarkCaseResult) -> CasePresentation:
         metrics=_case_metrics(result),
         handoffs=_handoffs(result),
         action_attempts=_action_attempts(result),
+        hypotheses=_hypotheses(result),
         evidence=_evidence(result),
         safety=_safety(result),
         report=_report(result),

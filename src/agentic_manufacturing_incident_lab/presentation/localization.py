@@ -58,9 +58,19 @@ _EXACT_TEXT = {
         "Benchmark 注入了互相矛盾的核准結果。",
     "Safety review approved a diagnostic run without evidence-backed completion.":
         "Safety Review 核准了缺乏 Evidence-backed completion 的診斷流程。",
+    "Shared network infrastructure is unavailable.":
+        "共用網路基礎設施不可用。",
 }
 
 _PATTERNS = (
+    (
+        re.compile(r"The connectivity fault is isolated to (ST-\d+)\."),
+        r"連線故障隔離在單一工作站 \1。",
+    ),
+    (
+        re.compile(r"The telemetry path for (ST-\d+) is unavailable\."),
+        r"工作站 \1 的 Telemetry 路徑不可用。",
+    ),
     (
         re.compile(r"The observed connectivity failure is isolated to (ST-\d+)\."),
         r"觀察到的連線故障目前隔離在 \1。",

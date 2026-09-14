@@ -45,7 +45,7 @@ def test_app_loads_incident_workbench_without_running_case() -> None:
     assert app.selectbox[0].value == "isolated-station-seed-43"
     assert app.button[0].label == "執行調查 Run investigation"
     assert any("請選擇案例" in info.value for info in app.info)
-    assert any("介面版本：中文調查產物 v1" in caption.value for caption in app.caption)
+    assert any("介面版本：Hypothesis Engine v1" in caption.value for caption in app.caption)
 
 
 def test_run_button_executes_default_case_and_displays_metrics() -> None:
@@ -59,8 +59,12 @@ def test_run_button_executes_default_case_and_displays_metrics() -> None:
     assert any(metric.label == "基準結果 Benchmark" for metric in app.metric)
     assert any(metric.value == "PASS" for metric in app.metric)
     assert any("調查完成" in success.value for success in app.success)
-    assert len(app.get("tab")) == 5
-    assert len(app.dataframe) == 3
+    assert len(app.get("tab")) == 6
+    assert len(app.dataframe) == 4
+    assert any(
+        "Hypothesis 不是正式 Evidence" in caption.value
+        for caption in app.caption
+    )
     assert any(
         "Benchmark 稽核軌跡： isolated-station-seed-43" in code.value
         for code in app.code

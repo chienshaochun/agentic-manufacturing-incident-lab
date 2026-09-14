@@ -38,11 +38,11 @@
 - 故障注入、評估指標與完整追蹤紀錄
 - Streamlit 操作介面與事件調查報告
 
-詳細邊界與驗收條件見 [產品契約](docs/PRODUCT_CONTRACT.md)，逐步實作方式見 [學習路線圖](docs/LEARNING_ROADMAP.md)，Phase 1 的資料關係見 [領域模型](docs/DOMAIN_MODEL.md)，Phase 2 的執行架構見 [模擬環境與工具系統](docs/PHASE_2_SIMULATOR_AND_TOOLS.md)，Phase 3 的決策流程見 [單一 Agent 決策循環](docs/PHASE_3_SINGLE_AGENT_LOOP.md)，Phase 4 的恢復架構見 [工作記憶與 Checkpoint](docs/PHASE_4_MEMORY_AND_CHECKPOINTS.md)，Phase 5 的安全邊界見 [批准、安全與故障恢復](docs/PHASE_5_SAFETY_AND_RECOVERY.md)，Phase 6 的角色分工見 [多 Agent 協作與比較](docs/PHASE_6_MULTI_AGENT_COLLABORATION.md)，Phase 7 的量化驗證見 [評估、故障注入與可觀測性](docs/PHASE_7_EVALUATION_AND_OBSERVABILITY.md)，Phase 8 的完整操作方式見 [Streamlit 事件調查操作台](docs/PHASE_8_STREAMLIT_WORKBENCH.md)。
+詳細邊界與驗收條件見 [產品契約](docs/PRODUCT_CONTRACT.md)，逐步實作方式見 [學習路線圖](docs/LEARNING_ROADMAP.md)，Phase 1 的資料關係見 [領域模型](docs/DOMAIN_MODEL.md)，Phase 2 的執行架構見 [模擬環境與工具系統](docs/PHASE_2_SIMULATOR_AND_TOOLS.md)，Phase 3 的決策流程見 [單一 Agent 決策循環](docs/PHASE_3_SINGLE_AGENT_LOOP.md)，Phase 4 的恢復架構見 [工作記憶與 Checkpoint](docs/PHASE_4_MEMORY_AND_CHECKPOINTS.md)，Phase 5 的安全邊界見 [批准、安全與故障恢復](docs/PHASE_5_SAFETY_AND_RECOVERY.md)，Phase 6 的角色分工見 [多 Agent 協作與比較](docs/PHASE_6_MULTI_AGENT_COLLABORATION.md)，Phase 7 的量化驗證見 [評估、故障注入與可觀測性](docs/PHASE_7_EVALUATION_AND_OBSERVABILITY.md)，Phase 8 的完整操作方式見 [Streamlit 事件調查操作台](docs/PHASE_8_STREAMLIT_WORKBENCH.md)，Phase 9 的假設推理見 [Hypothesis Engine](docs/PHASE_9_HYPOTHESIS_ENGINE.md)。
 
 ## 目前進度
 
-Phase 8 已完成：除了 Phase 7 的 11 個 controlled behavior 與 Specialist failure cases，現在也能在中英雙語 Streamlit 操作台執行單案、查看完整 Agent 履歷、比較全體 Benchmark，並下載 Markdown、JSON、CSV 與文字產物。調查敘述、Observation、Evidence、安全審查、正式報告、失敗原因、Raw trace 與 Benchmark 摘要皆採中文優先；Agent、Evidence、Handoff、工具名稱、案例 ID、schema 欄位與 `safe_stopped` 等技術識別則保留英文，方便面試說明、除錯與機器交換。整個 app 維持 deterministic、合成資料、只讀診斷與無 LLM 的明確邊界。
+Phase 9 已完成：除了 Phase 7 的 11 個 controlled behavior 與 Specialist failure cases，現在也能在中英雙語 Streamlit 操作台執行單案、查看完整 Agent 履歷、比較全體 Benchmark，並下載 Markdown、JSON、CSV 與文字產物。Hypothesis Engine會同時呈現競爭中的候選原因、支持與反對它的Observation，並與正式Evidence明確分離。整個app維持deterministic、合成資料、只讀診斷與無LLM的明確邊界。
 
 ## 本機手動演練
 

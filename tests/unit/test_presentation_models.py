@@ -30,6 +30,9 @@ def test_completed_case_presentation_contains_all_ui_sections() -> None:
     assert len(view.metrics) == 7
     assert len(view.handoffs) == 6
     assert len(view.action_attempts) == 3
+    assert len(view.hypotheses) == 3
+    assert view.hypotheses[0].status == "supported"
+    assert "單一工作站 ST-02" in view.hypotheses[0].statement
     assert len(view.evidence) == 1
     assert view.safety is not None
     assert view.safety.outcome == "approved"
@@ -57,6 +60,7 @@ def test_diagnostic_failure_presentation_has_failure_but_no_products() -> None:
     assert view.diagnostic_status == "none"
     assert len(view.handoffs) == 1
     assert view.action_attempts == ()
+    assert view.hypotheses == ()
     assert view.evidence == ()
     assert view.safety is None
     assert view.report is None

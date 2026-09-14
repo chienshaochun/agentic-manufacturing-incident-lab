@@ -39,7 +39,7 @@ CASE_LABELS = {
 WORKBENCH_PAGE = "事件調查台 Incident Workbench"
 BENCHMARK_PAGE = "基準測試 Benchmark Dashboard"
 ABOUT_PAGE = "關於專案 About"
-APP_RELEASE = "中文調查產物 v1"
+APP_RELEASE = "Hypothesis Engine v1"
 
 
 def _metric_grid(metrics) -> None:
@@ -97,9 +97,10 @@ def _render_case_details(view: CasePresentation) -> None:
     st.subheader("調查總覽 Investigation overview")
     _metric_grid(view.metrics)
     _render_case_status(view)
-    handoff_tab, action_tab, evidence_tab, outcome_tab, trace_tab = st.tabs(
+    handoff_tab, hypothesis_tab, action_tab, evidence_tab, outcome_tab, trace_tab = st.tabs(
         (
             "交接紀錄 Handoffs",
+            "診斷假設 Hypotheses",
             "動作與嘗試 Actions & attempts",
             "證據與安全 Evidence & safety",
             "報告與失敗 Report & failures",
@@ -123,6 +124,30 @@ def _render_case_details(view: CasePresentation) -> None:
                 "reply_to": "回覆對象",
             },
         )
+
+    with hypothesis_tab:
+        st.markdown("#### 競爭中的故障假設")
+        st.caption(
+            "每個候選原因都分別累積支持與反對它的 Observation；"
+            "Hypothesis 不是正式 Evidence，也不等同已確認 Root Cause。"
+        )
+        if view.hypotheses:
+            st.dataframe(
+                [asdict(hypothesis) for hypothesis in view.hypotheses],
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "hypothesis_id": "Hypothesis ID",
+                    "statement": "候選原因",
+                    "status": "狀態",
+                    "confidence": "信心值",
+                    "supporting_observation_ids": "支持的 Observations",
+                    "contradicting_observation_ids": "反對的 Observations",
+                    "rationale": "評分摘要",
+                },
+            )
+        else:
+            st.info("Diagnostic Agent 沒有產生可顯示的診斷假設。")
 
     with action_tab:
         st.markdown("#### 診斷動作與實際嘗試")

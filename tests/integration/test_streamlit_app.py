@@ -42,7 +42,8 @@ def test_app_loads_incident_workbench_without_running_case() -> None:
     app = load_app()
 
     assert app.title[0].value == "製造事件調查台"
-    assert app.selectbox[0].value == "設備無法連線或遙測中斷"
+    assert app.selectbox[0].value == "單一設備無法連線"
+    assert len(app.selectbox[0].options) == 4
     assert app.selectbox[1].value == "isolated-station-seed-43"
     assert app.selectbox[1].label == "選擇可重播模擬批次 Simulation batch"
     assert app.button[0].label == "執行調查 Run investigation"
@@ -113,7 +114,7 @@ def test_case_download_buttons_serve_chinese_markdown_and_trace() -> None:
 def test_uncertain_symptom_batch_safe_stops_without_report() -> None:
     app = load_app()
 
-    app.selectbox[0].set_value("製程數值持續平線").run()
+    app.selectbox[0].set_value("設備在線，但製程數值持續平線").run()
     app.selectbox[1].set_value("low-quality-configuration-evidence-seed-120").run()
     app.button[0].click().run()
 

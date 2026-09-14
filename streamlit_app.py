@@ -43,14 +43,18 @@ CASE_LABELS = {
 }
 
 SYMPTOM_CASES = {
-    "設備無法連線或遙測中斷": (
+    "單一設備無法連線": (
         "isolated-station-seed-43",
-        "shared-infrastructure-seed-73",
-        "telemetry-path-seed-91",
         "isolated-station-seed-42",
         "isolated-station-seed-44",
     ),
-    "製程數值持續平線": (
+    "多台設備同時無法連線": (
+        "shared-infrastructure-seed-73",
+    ),
+    "設備可連線，但 Telemetry 沒有更新": (
+        "telemetry-path-seed-91",
+    ),
+    "設備在線，但製程數值持續平線": (
         "sensor-staleness-seed-117",
         "configuration-drift-seed-118",
         "conflicting-sensor-evidence-seed-119",
@@ -60,9 +64,16 @@ SYMPTOM_CASES = {
 }
 
 SIMULATION_BATCH_LABELS = {
-    case_id: f"模擬批次 {chr(65 + index)}｜固定資料，可重播"
-    for case_ids in SYMPTOM_CASES.values()
-    for index, case_id in enumerate(case_ids)
+    "isolated-station-seed-43": "模擬批次 A｜ST-02 回報，可重播",
+    "isolated-station-seed-42": "模擬批次 B｜ST-01 回報，可重播",
+    "isolated-station-seed-44": "模擬批次 C｜ST-03 回報，可重播",
+    "shared-infrastructure-seed-73": "模擬批次 A｜跨設備回報，可重播",
+    "telemetry-path-seed-91": "模擬批次 A｜Telemetry 缺值回報，可重播",
+    "sensor-staleness-seed-117": "模擬批次 A｜標準資料組，可重播",
+    "configuration-drift-seed-118": "模擬批次 B｜標準資料組，可重播",
+    "conflicting-sensor-evidence-seed-119": "模擬批次 C｜交叉來源不一致，可重播",
+    "low-quality-configuration-evidence-seed-120": "模擬批次 D｜關鍵資料新鮮度偏低，可重播",
+    "multiple-supported-causes-seed-121": "模擬批次 E｜多組訊號同時成立，可重播",
 }
 
 WORKBENCH_PAGE = "事件調查台 Incident Workbench"

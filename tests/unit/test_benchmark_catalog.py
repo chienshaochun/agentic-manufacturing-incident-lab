@@ -26,12 +26,22 @@ def case_by_id(case_id: str) -> BenchmarkCase:
     return next(case for case in catalog() if case.case_id == case_id)
 
 
-def test_catalog_has_unique_six_controlled_cases() -> None:
+def test_catalog_has_unique_eight_controlled_cases() -> None:
     cases = catalog()
 
     assert isinstance(cases, tuple)
-    assert len(cases) == 6
-    assert len({case.case_id for case in cases}) == 6
+    assert len(cases) == 8
+    assert len({case.case_id for case in cases}) == 8
+
+
+def test_flatline_cases_share_symptom_but_expect_different_causes() -> None:
+    stale = case_by_id("sensor-staleness-seed-117")
+    drift = case_by_id("configuration-drift-seed-118")
+
+    assert stale.scenario.incident.title == drift.scenario.incident.title
+    assert stale.expectation.expected_tool_sequence == drift.expectation.expected_tool_sequence
+    assert "stale sensor data" in stale.expectation.expected_evidence_claims[0]
+    assert "configuration drift" in drift.expectation.expected_evidence_claims[0]
 
 
 def test_isolated_cases_rotate_fault_across_all_stations() -> None:

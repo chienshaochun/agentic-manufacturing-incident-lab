@@ -29,6 +29,8 @@ CASE_LABELS = {
     "shared-infrastructure-seed-73": "共用基礎設施疑點｜Shared infrastructure",
     "telemetry-path-seed-91": "遙測路徑疑點｜Telemetry path",
     "action-budget-safe-stop-seed-43": "動作額度耗盡｜Action budget safe stop",
+    "sensor-staleness-seed-117": "製程訊號平線：感測器資料過期｜Sensor staleness",
+    "configuration-drift-seed-118": "製程訊號平線：設定版本漂移｜Configuration drift",
     "diagnostic-exception-seed-43": "診斷 Agent 例外｜Diagnostic exception",
     "diagnostic-invalid-response-seed-43": "診斷回覆無效｜Invalid response",
     "safety-reviewer-exception-seed-43": "安全審查 Agent 例外｜Reviewer exception",
@@ -39,7 +41,7 @@ CASE_LABELS = {
 WORKBENCH_PAGE = "事件調查台 Incident Workbench"
 BENCHMARK_PAGE = "基準測試 Benchmark Dashboard"
 ABOUT_PAGE = "關於專案 About"
-APP_RELEASE = "Dynamic Hypothesis Planner v1"
+APP_RELEASE = "Multi-source Manufacturing Diagnostics v1"
 
 
 def _metric_grid(metrics) -> None:
@@ -326,7 +328,7 @@ def _benchmark_dashboard() -> None:
 
     view = _current_benchmark_view()
     if view is None:
-        st.info("執行 Benchmark 後，即可比較全部 11 個受控案例。")
+        st.info("執行 Benchmark 後，即可比較全部 13 個受控案例。")
         return
 
     _metric_grid(view.metrics)

@@ -14,6 +14,8 @@ from agentic_manufacturing_incident_lab.evaluation.contracts import (
 )
 from agentic_manufacturing_incident_lab.simulation import (
     ScenarioDefinition,
+    build_configuration_drift_scenario,
+    build_sensor_staleness_scenario,
     build_shared_connectivity_scenario,
     build_station_connectivity_scenario,
     build_telemetry_path_scenario,
@@ -165,6 +167,44 @@ def _budget_limited_case() -> BenchmarkCase:
     )
 
 
+def _manufacturing_signal_case(*, configuration_drift: bool) -> BenchmarkCase:
+    scenario = (
+        build_configuration_drift_scenario(seed=118)
+        if configuration_drift
+        else build_sensor_staleness_scenario(seed=117)
+    )
+    affected = scenario.incident.asset_id
+    cause = "configuration drift" if configuration_drift else "stale sensor data"
+    suffix = "configuration-drift" if configuration_drift else "sensor-staleness"
+    return BenchmarkCase(
+        scenario=scenario,
+        action_limit=32,
+        expectation=BenchmarkExpectation(
+            case_id=f"{suffix}-seed-{scenario.seed}",
+            scenario_id=scenario.scenario_id,
+            seed=scenario.seed,
+            incident_id=scenario.incident.incident_id,
+            expected_multi_status=MultiAgentStatus.COMPLETED,
+            expected_diagnostic_status=TaskStatus.COMPLETED,
+            expected_tool_sequence=(
+                "read_alarm_history",
+                "check_connectivity",
+                "read_telemetry",
+                "inspect_configuration",
+                "read_maintenance_record",
+                "check_sensor_freshness",
+            ),
+            expected_evidence_claims=(
+                f"The flatlined process signal is caused by {cause} on {affected}.",
+            ),
+            expected_safety_outcome=SafetyReviewOutcome.APPROVED,
+            expect_report=True,
+            max_tool_calls=6,
+            max_handoffs=6,
+        ),
+    )
+
+
 def build_controlled_benchmark_catalog() -> tuple[BenchmarkCase, ...]:
     """Return deterministic success, ambiguity, and safe-stop cases."""
     cases = (
@@ -174,6 +214,8 @@ def build_controlled_benchmark_catalog() -> tuple[BenchmarkCase, ...]:
         _shared_infrastructure_case(),
         _telemetry_path_case(),
         _budget_limited_case(),
+        _manufacturing_signal_case(configuration_drift=False),
+        _manufacturing_signal_case(configuration_drift=True),
     )
     case_ids = tuple(case.case_id for case in cases)
     if len(set(case_ids)) != len(case_ids):

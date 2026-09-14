@@ -83,15 +83,15 @@ def test_benchmark_presentation_contains_aggregate_cards_and_rows() -> None:
     view = build_benchmark_presentation(run_phase7_benchmark())
 
     assert tuple(card.value for card in view.metrics) == (
-        "11",
-        "11",
+        "13",
+        "13",
         "1.000",
         "1.000",
         "1.000",
-        "21",
-        "44",
+        "33",
+        "56",
     )
-    assert len(view.rows) == 11
+    assert len(view.rows) == 13
     assert all(row.passed for row in view.rows)
     assert view.rows[-1].failure == "conflicting_result"
     assert "- 是否全部通過： yes" in view.summary_text

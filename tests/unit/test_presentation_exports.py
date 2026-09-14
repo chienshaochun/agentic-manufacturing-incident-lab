@@ -54,8 +54,8 @@ def test_benchmark_exports_have_all_cases_and_stable_columns() -> None:
     document = json.loads(benchmark_json(view))
     rows = list(csv.DictReader(StringIO(benchmark_csv(view))))
 
-    assert len(document["rows"]) == 11
-    assert len(rows) == 11
+    assert len(document["rows"]) == 13
+    assert len(rows) == 13
     assert tuple(rows[0]) == (
         "case",
         "workflow",

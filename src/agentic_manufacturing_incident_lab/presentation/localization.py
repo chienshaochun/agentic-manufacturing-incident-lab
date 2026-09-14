@@ -30,6 +30,24 @@ _EXACT_TEXT = {
         "規劃政策 station_connectivity_rule_based_v1 已啟動。",
     "Planning policy station_hypothesis_utility_v1 started.":
         "假設效用規劃政策 station_hypothesis_utility_v1 已啟動。",
+    "Planning policy manufacturing_signal_utility_v1 started.":
+        "多來源製造診斷政策 manufacturing_signal_utility_v1 已啟動。",
+    "Distinguish sensor staleness, configuration drift, planned maintenance, and transport-path failures.":
+        "區分感測器資料過期、設定漂移、計畫性維護與傳輸路徑故障。",
+    "Read alarm history for an initial symptom fingerprint.":
+        "先讀取警報歷史，建立初步症狀指紋。",
+    "Verify the affected station network path.":
+        "確認受影響工作站的網路路徑。",
+    "Verify that the telemetry transport still returns data.":
+        "確認 Telemetry 傳輸仍能回傳資料。",
+    "Compare the active and expected configuration versions.":
+        "比較目前生效版本與預期設定版本。",
+    "Check whether planned maintenance explains the signal gap.":
+        "檢查計畫性維護是否能解釋訊號中斷。",
+    "Measure whether source sensor values are still refreshing.":
+        "量測來源感測器的數值是否仍持續更新。",
+    "One cause is supported and every competing hypothesis is rejected by independent observations.":
+        "一個原因已獲支持，且其他競爭假設都被獨立 Observation 排除。",
     "The affected station is unreachable and has no telemetry while a peer station remains reachable.":
         "受影響工作站無法連線且沒有 Telemetry，但 Peer Station 仍可連線。",
     "Both the affected and peer stations are unreachable, so the evidence does not support an isolated-station conclusion.":
@@ -92,6 +110,61 @@ _PATTERNS = (
     (
         re.compile(r"Telemetry for (ST-\d+) is available\."),
         r"\1 的 Telemetry 可用。",
+    ),
+    (
+        re.compile(r"Alarm history for (ST-\d+): (.*)\."),
+        r"\1 的警報歷史：\2。",
+    ),
+    (
+        re.compile(r"Configuration for (ST-\d+) matches the expected version\."),
+        r"\1 的設定符合預期版本。",
+    ),
+    (
+        re.compile(r"Configuration for (ST-\d+) differs from the expected version\."),
+        r"\1 的設定與預期版本不同。",
+    ),
+    (
+        re.compile(r"Planned maintenance for (ST-\d+) is (active|inactive)\."),
+        lambda match: (
+            f"{match.group(1)} 的計畫性維護"
+            f"{'正在進行' if match.group(2) == 'active' else '未啟用'}。"
+        ),
+    ),
+    (
+        re.compile(r"Sensor data for (ST-\d+) is (fresh|stale) \(age=(\d+)s\)\."),
+        lambda match: (
+            f"{match.group(1)} 的感測器資料"
+            f"{'持續更新' if match.group(2) == 'fresh' else '已過期'}"
+            f"（資料年齡={match.group(3)} 秒）。"
+        ),
+    ),
+    (
+        re.compile(r"The network path for (ST-\d+) is unavailable\."),
+        r"\1 的網路路徑不可用。",
+    ),
+    (
+        re.compile(r"The telemetry service for (ST-\d+) is unavailable\."),
+        r"\1 的 Telemetry 服務不可用。",
+    ),
+    (
+        re.compile(r"Configuration drift affects (ST-\d+)\."),
+        r"\1 發生設定版本漂移。",
+    ),
+    (
+        re.compile(r"Planned maintenance explains the signal gap on (ST-\d+)\."),
+        r"\1 的訊號中斷可由計畫性維護解釋。",
+    ),
+    (
+        re.compile(r"Sensor data on (ST-\d+) is stale\."),
+        r"\1 的感測器資料已過期。",
+    ),
+    (
+        re.compile(r"The flatlined process signal is caused by stale sensor data on (ST-\d+)\."),
+        r"\1 的製程訊號平線是由感測器資料過期造成。",
+    ),
+    (
+        re.compile(r"The flatlined process signal is caused by configuration drift on (ST-\d+)\."),
+        r"\1 的製程訊號平線是由設定版本漂移造成。",
     ),
     (
         re.compile(

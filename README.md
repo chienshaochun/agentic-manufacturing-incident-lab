@@ -38,11 +38,11 @@
 - 故障注入、評估指標與完整追蹤紀錄
 - Streamlit 操作介面與事件調查報告
 
-詳細邊界與驗收條件見 [產品契約](docs/PRODUCT_CONTRACT.md)，逐步實作方式見 [學習路線圖](docs/LEARNING_ROADMAP.md)，Phase 1 的資料關係見 [領域模型](docs/DOMAIN_MODEL.md)，Phase 2 的執行架構見 [模擬環境與工具系統](docs/PHASE_2_SIMULATOR_AND_TOOLS.md)，Phase 3 的決策流程見 [單一 Agent 決策循環](docs/PHASE_3_SINGLE_AGENT_LOOP.md)，Phase 4 的恢復架構見 [工作記憶與 Checkpoint](docs/PHASE_4_MEMORY_AND_CHECKPOINTS.md)，Phase 5 的安全邊界見 [批准、安全與故障恢復](docs/PHASE_5_SAFETY_AND_RECOVERY.md)，Phase 6 的角色分工見 [多 Agent 協作與比較](docs/PHASE_6_MULTI_AGENT_COLLABORATION.md)，Phase 7 的量化驗證見 [評估、故障注入與可觀測性](docs/PHASE_7_EVALUATION_AND_OBSERVABILITY.md)，Phase 8 的完整操作方式見 [Streamlit 事件調查操作台](docs/PHASE_8_STREAMLIT_WORKBENCH.md)，Phase 9 的假設推理見 [Hypothesis Engine](docs/PHASE_9_HYPOTHESIS_ENGINE.md)，Phase 10 的決策方式見 [動態工具選擇](docs/PHASE_10_DYNAMIC_TOOL_SELECTION.md)。
+詳細邊界與驗收條件見 [產品契約](docs/PRODUCT_CONTRACT.md)，逐步實作方式見 [學習路線圖](docs/LEARNING_ROADMAP.md)，Phase 1 的資料關係見 [領域模型](docs/DOMAIN_MODEL.md)，Phase 2 的執行架構見 [模擬環境與工具系統](docs/PHASE_2_SIMULATOR_AND_TOOLS.md)，Phase 3 的決策流程見 [單一 Agent 決策循環](docs/PHASE_3_SINGLE_AGENT_LOOP.md)，Phase 4 的恢復架構見 [工作記憶與 Checkpoint](docs/PHASE_4_MEMORY_AND_CHECKPOINTS.md)，Phase 5 的安全邊界見 [批准、安全與故障恢復](docs/PHASE_5_SAFETY_AND_RECOVERY.md)，Phase 6 的角色分工見 [多 Agent 協作與比較](docs/PHASE_6_MULTI_AGENT_COLLABORATION.md)，Phase 7 的量化驗證見 [評估、故障注入與可觀測性](docs/PHASE_7_EVALUATION_AND_OBSERVABILITY.md)，Phase 8 的完整操作方式見 [Streamlit 事件調查操作台](docs/PHASE_8_STREAMLIT_WORKBENCH.md)，Phase 9 的假設推理見 [Hypothesis Engine](docs/PHASE_9_HYPOTHESIS_ENGINE.md)，Phase 10 的決策方式見 [動態工具選擇](docs/PHASE_10_DYNAMIC_TOOL_SELECTION.md)，Phase 11 的跨來源案例見 [多來源製造診斷情境](docs/PHASE_11_REALISTIC_MANUFACTURING_SCENARIOS.md)。
 
 ## 目前進度
 
-Phase 10 已完成：Hypothesis Engine會呈現競爭中的候選原因、支持與反對它的Observation；Hypothesis-driven Planner則依資訊涵蓋率、風險、成本與重複懲罰動態選擇下一個診斷Probe。整個app維持deterministic、合成資料、只讀診斷與無LLM的明確邊界。
+Phase 11 已完成：除了工作站連線案例，系統現在也能針對相同的「製程訊號平線」症狀，整合 Alarm、Connectivity、Telemetry、Configuration、Maintenance 與 Sensor freshness，分辨感測器資料過期和設定版本漂移。整個 app 維持 deterministic、合成資料、只讀診斷與無 LLM 的明確邊界。
 
 ## 本機手動演練
 

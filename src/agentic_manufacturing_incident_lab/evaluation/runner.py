@@ -2,7 +2,10 @@
 
 from dataclasses import dataclass, replace
 
-from agentic_manufacturing_incident_lab.agent import HypothesisDrivenPlanner
+from agentic_manufacturing_incident_lab.agent import (
+    HypothesisDrivenPlanner,
+    ManufacturingSignalPlanner,
+)
 from agentic_manufacturing_incident_lab.collaboration import (
     CoordinatorAgent,
     DiagnosticAgent,
@@ -22,7 +25,13 @@ from agentic_manufacturing_incident_lab.evaluation.contracts import (
     BenchmarkMetrics,
 )
 from agentic_manufacturing_incident_lab.simulation import SimulatedEnvironment
-from agentic_manufacturing_incident_lab.tools import build_diagnostic_registry
+from agentic_manufacturing_incident_lab.hypotheses import (
+    ManufacturingSignalHypothesisPolicy,
+)
+from agentic_manufacturing_incident_lab.tools import (
+    build_diagnostic_registry,
+    build_manufacturing_diagnostic_registry,
+)
 
 
 class _RaisingDiagnostic:
@@ -245,11 +254,19 @@ def run_benchmark_case(case: BenchmarkCase) -> BenchmarkCaseResult:
     """Execute one case without exposing hidden scenario truth to specialists."""
     environment = SimulatedEnvironment(case.scenario)
     brief = environment.brief
-    diagnostic = DiagnosticAgent(
-        policy=HypothesisDrivenPlanner(),
-        registry=build_diagnostic_registry(environment),
-        action_limit=case.action_limit,
-    )
+    if case.scenario.scenario_id.startswith("manufacturing-signal-flatline-"):
+        diagnostic = DiagnosticAgent(
+            policy=ManufacturingSignalPlanner(),
+            registry=build_manufacturing_diagnostic_registry(environment),
+            hypothesis_policy=ManufacturingSignalHypothesisPolicy(),
+            action_limit=case.action_limit,
+        )
+    else:
+        diagnostic = DiagnosticAgent(
+            policy=HypothesisDrivenPlanner(),
+            registry=build_diagnostic_registry(environment),
+            action_limit=case.action_limit,
+        )
     safety_reviewer = SafetyReviewerAgent()
     reporter = ReporterAgent()
     if case.specialist_fault is SpecialistFault.DIAGNOSTIC_ERROR:

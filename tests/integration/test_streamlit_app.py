@@ -45,7 +45,7 @@ def test_app_loads_incident_workbench_without_running_case() -> None:
     assert app.selectbox[0].value == "isolated-station-seed-43"
     assert app.button[0].label == "執行調查 Run investigation"
     assert any("請選擇案例" in info.value for info in app.info)
-    assert any("介面版本：Dynamic Hypothesis Planner v1" in caption.value for caption in app.caption)
+    assert any("介面版本：Multi-source Manufacturing Diagnostics v1" in caption.value for caption in app.caption)
 
 
 def test_run_button_executes_default_case_and_displays_metrics() -> None:
@@ -126,12 +126,12 @@ def test_benchmark_dashboard_runs_all_controlled_cases() -> None:
     app.button[0].click().run(timeout=60)
 
     assert not app.exception
-    assert any(metric.label == "案例數 Cases" and metric.value == "11" for metric in app.metric)
-    assert any(metric.label == "通過 Passed" and metric.value == "11" for metric in app.metric)
+    assert any(metric.label == "案例數 Cases" and metric.value == "13" for metric in app.metric)
+    assert any(metric.label == "通過 Passed" and metric.value == "13" for metric in app.metric)
     assert len(app.dataframe) == 1
-    assert len(app.dataframe[0].value) == 11
+    assert len(app.dataframe[0].value) == 13
     assert any("所有案例" in success.value for success in app.success)
-    assert any("- 案例數： 11" in code.value for code in app.code)
+    assert any("- 案例數： 13" in code.value for code in app.code)
 
 
 def test_about_page_explains_deterministic_no_llm_boundary() -> None:

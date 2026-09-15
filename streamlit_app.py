@@ -37,6 +37,7 @@ from agentic_manufacturing_incident_lab.local_llm import (
     DEFAULT_OLLAMA_MODEL,
     OllamaError,
     OllamaInvestigationQA,
+    build_investigation_packet,
 )
 
 
@@ -289,6 +290,26 @@ def _render_local_investigation_qa(result: BenchmarkCaseResult) -> None:
             f"{', '.join(answer.observation_ids)} · 引用 Evidence："
             f"{', '.join(answer.evidence_ids) or '無'}"
         )
+        st.warning(
+            "模型說明仍可能誤讀資料；請以下方由程式直接取出的引用紀錄為準。"
+        )
+        packet = build_investigation_packet(result.run)
+        cited_observations = [
+            item
+            for item in packet["observations"]
+            if item["id"] in answer.observation_ids
+        ]
+        cited_evidence = [
+            item
+            for item in packet["evidence"]
+            if item["id"] in answer.evidence_ids
+        ]
+        if cited_observations:
+            st.markdown("##### 程式驗證的 Observation 引用")
+            st.dataframe(cited_observations, hide_index=True, width="stretch")
+        if cited_evidence:
+            st.markdown("##### 程式驗證的 Evidence 引用")
+            st.dataframe(cited_evidence, hide_index=True, width="stretch")
         if answer.next_checks:
             st.markdown("##### 建議的下一步檢查（尚未執行）")
             st.dataframe(

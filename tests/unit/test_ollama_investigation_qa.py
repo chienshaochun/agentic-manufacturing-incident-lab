@@ -69,6 +69,8 @@ def test_qa_returns_validated_cited_answer() -> None:
     assert answer.next_checks[0].action == "檢查 ST-02 網路介面"
     assert client.call["schema"]["additionalProperties"] is False
     assert "Hypothesis 不是 Evidence" in client.call["system_prompt"]
+    assert "不可無理由重複" in client.call["system_prompt"]
+    assert "quality_factor 小於 0.8" in client.call["system_prompt"]
     assert "INC-CONNECTIVITY-0043" in client.call["user_prompt"]
 
 

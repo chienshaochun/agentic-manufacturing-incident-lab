@@ -116,7 +116,11 @@
 
 ## Phase 17：Ollama Structured Parser
 
-讓本機 Ollama 只負責把操作員文字轉成 Phase 16 Schema，並加入逾時、格式錯誤、低信心 fallback 與模型／人工結果比較。此階段暫緩，等確認本機硬體、模型大小與部署模式後再實作。
+讓本機 Ollama 把操作員文字轉成 Phase 16 Schema，並在調查後提供 Evidence-bound 問答。模型只能使用 loopback endpoint、結構化輸出與既有 Observation／Evidence ID；連線或格式失敗時保留手動表單和 deterministic fallback。公開 Streamlit 版本不啟用 Ollama，本機模式以環境變數選用。
+
+物理意義：替既有調查台增加一位會整理報修單與解釋調查紀錄的本機助理，但量測、假設裁決、安全簽核與 Tool 權限仍掌握在可測試的原有系統。
+
+完成狀態：已完成；見 [Phase 17 說明](PHASE_17_LOCAL_OLLAMA.md)。
 
 ## 技術採用順序
 

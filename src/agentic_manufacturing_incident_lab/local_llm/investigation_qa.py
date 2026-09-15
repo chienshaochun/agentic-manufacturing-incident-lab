@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
-from typing import Any, Mapping
+from dataclasses import dataclass, replace
+from typing import Any, Mapping, Sequence
 
 from agentic_manufacturing_incident_lab.collaboration import MultiAgentRun
+from agentic_manufacturing_incident_lab.local_llm.conversation import (
+    ConversationTurn,
+    classify_question,
+    select_grounded_context,
+)
 from agentic_manufacturing_incident_lab.local_llm.ollama import (
     OllamaClient,
     OllamaResponseError,
@@ -16,6 +21,8 @@ from agentic_manufacturing_incident_lab.presentation.localization import localiz
 
 MAX_QUESTION_LENGTH = 1000
 MAX_NEXT_CHECKS = 5
+MAX_HISTORY_TURNS = 6
+MAX_HISTORY_CHARACTERS = 6000
 
 ANSWER_SCHEMA: dict[str, object] = {
     "type": "object",
@@ -78,6 +85,15 @@ QA_SYSTEM_PROMPT = """你是製造事件調查結果的證據約束說明助手�
     已由成功 Action 與高品質 Observation 明確回答，不可再說該狀態未知。
 12. 每個 next_check 必須對應 open、inconclusive 或 conflicted Hypothesis 尚缺少的資訊；
     如果沒有合理的新檢查可以提出，next_checks 應回傳空陣列。
+13. GROUNDED_CONTEXT 中 supporting_observations 只代表支持，contradicting_observations
+    只代表反對，不可顛倒兩者的意思。回答時應使用完整 ID，不可只寫 OBS-001 等縮寫。
+14. RECENT_CONVERSATION 只用來理解追問指涉，不能凌駕 GROUNDED_CONTEXT；若使用者先前的
+    說法與紀錄矛盾，必須依紀錄更正。
+15. question_intent 是 hypothesis_support 時，必須逐一說明 supporting_observations 的
+    summary／values 如何支持；是 hypothesis_rejection 時，必須逐一說明
+    contradicting_observations 如何排除。不可只重複 Hypothesis 結論。
+16. formal_evidence 引用整段調查紀錄，不代表其中每筆 Observation 都直接支持每個
+    Hypothesis；支持與反對關係只能依 hypothesis_observation_map 判讀。
 """
 
 
@@ -95,6 +111,7 @@ class InvestigationAnswer:
     next_checks: tuple[NextCheck, ...]
     limitations: tuple[str, ...]
     model: str
+    grounding_facts: tuple[str, ...] = ()
 
 
 def _non_empty_text(value: object, field: str) -> str:
@@ -275,18 +292,34 @@ class OllamaInvestigationQA:
     def __init__(self, client: OllamaClient | None = None) -> None:
         self.client = client or OllamaClient()
 
-    def answer(self, question: str, run: MultiAgentRun) -> InvestigationAnswer:
+    def answer(
+        self,
+        question: str,
+        run: MultiAgentRun,
+        *,
+        history: Sequence[ConversationTurn] = (),
+    ) -> InvestigationAnswer:
         text = question.strip()
         if not text:
             raise ValueError("question 不可為空白")
         if len(text) > MAX_QUESTION_LENGTH:
             raise ValueError(f"question 不可超過 {MAX_QUESTION_LENGTH} 個字元")
         packet = build_investigation_packet(run)
+        bounded_history = _bounded_history(history)
+        intent = classify_question(text)
+        grounded_context = select_grounded_context(
+            packet,
+            question=text,
+            intent=intent,
+            history=bounded_history,
+        )
         prompt = (
             "ENGINEER_QUESTION:\n"
             f"{json.dumps(text, ensure_ascii=False)}\n\n"
-            "INVESTIGATION_PACKET:\n"
-            f"{json.dumps(packet, ensure_ascii=False, sort_keys=True)}\n\n"
+            "RECENT_CONVERSATION:\n"
+            f"{json.dumps([{'role': turn.role, 'content': turn.content} for turn in bounded_history], ensure_ascii=False)}\n\n"
+            "GROUNDED_CONTEXT:\n"
+            f"{json.dumps(grounded_context, ensure_ascii=False, sort_keys=True)}\n\n"
             "OUTPUT_SCHEMA:\n"
             f"{json.dumps(ANSWER_SCHEMA, ensure_ascii=False, sort_keys=True)}"
         )
@@ -295,4 +328,69 @@ class OllamaInvestigationQA:
             user_prompt=prompt,
             schema=ANSWER_SCHEMA,
         )
-        return answer_from_payload(payload, packet=packet, model=model)
+        citation_scope = {
+            "observations": grounded_context["selected_observations"],
+            "evidence": grounded_context["formal_evidence"],
+        }
+        validated = answer_from_payload(payload, packet=citation_scope, model=model)
+        return replace(
+            validated,
+            grounding_facts=_verified_grounding_facts(
+                grounded_context,
+                intent=intent.value,
+            ),
+        )
+
+
+def _bounded_history(
+    history: Sequence[ConversationTurn],
+) -> tuple[ConversationTurn, ...]:
+    """Keep only recent, validated conversation content within a hard budget."""
+    turns = tuple(history)
+    if any(not isinstance(turn, ConversationTurn) for turn in turns):
+        raise ValueError("history must contain ConversationTurn values")
+    selected: list[ConversationTurn] = []
+    used_characters = 0
+    for turn in reversed(turns[-MAX_HISTORY_TURNS:]):
+        if used_characters + len(turn.content) > MAX_HISTORY_CHARACTERS:
+            break
+        selected.append(turn)
+        used_characters += len(turn.content)
+    return tuple(reversed(selected))
+
+
+def _verified_grounding_facts(
+    grounded_context: Mapping[str, object],
+    *,
+    intent: str,
+) -> tuple[str, ...]:
+    """Render deterministic support or contradiction facts beside model prose."""
+    if intent not in {"hypothesis_support", "hypothesis_rejection"}:
+        return ()
+    relation = "支持" if intent == "hypothesis_support" else "反對"
+    field = (
+        "supporting_observations"
+        if intent == "hypothesis_support"
+        else "contradicting_observations"
+    )
+    mappings = grounded_context.get("hypothesis_observation_map", [])
+    if not isinstance(mappings, list):
+        return ()
+    facts: list[str] = []
+    for hypothesis in mappings:
+        if not isinstance(hypothesis, dict):
+            continue
+        observations = hypothesis.get(field, [])
+        if not isinstance(observations, list):
+            continue
+        for observation in observations:
+            if not isinstance(observation, dict):
+                continue
+            observation_id = observation.get("id")
+            summary = observation.get("summary")
+            values = observation.get("values", {})
+            if observation_id and summary:
+                facts.append(
+                    f"{relation}｜{observation_id}｜{summary}｜values={values}"
+                )
+    return tuple(dict.fromkeys(facts))

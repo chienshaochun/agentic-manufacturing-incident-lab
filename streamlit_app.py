@@ -34,10 +34,13 @@ from agentic_manufacturing_incident_lab.intake import (
     intake_from_payload,
 )
 from agentic_manufacturing_incident_lab.local_llm import (
+    ConversationTurn,
     DEFAULT_OLLAMA_MODEL,
+    InvestigationAnswer,
     OllamaError,
     OllamaInvestigationQA,
     build_investigation_packet,
+    classify_question,
 )
 
 
@@ -104,7 +107,7 @@ SIMULATION_BATCH_LABELS = {
 WORKBENCH_PAGE = "事件調查台 Incident Workbench"
 BENCHMARK_PAGE = "基準測試 Benchmark Dashboard"
 ABOUT_PAGE = "關於專案 About"
-APP_RELEASE = "Local Ollama Enhancement v1"
+APP_RELEASE = "Conversational Copilot v1"
 LOCAL_OLLAMA_ENV = "INCIDENT_LAB_ENABLE_OLLAMA"
 
 NETWORK_STATUS_OPTIONS = {
@@ -254,73 +257,139 @@ def _intake_from_form(
     )
 
 
-def _render_local_investigation_qa(result: BenchmarkCaseResult) -> None:
-    """Append optional local Q&A after the unchanged investigation result."""
-    with st.expander("本機 Ollama 調查問答（選用）", expanded=False):
-        st.caption(
-            "回答只使用本次調查的 Observation、Hypothesis、Evidence 與安全審查；"
-            "不會改寫正式結果，也不會執行 Tool。"
-        )
-        with st.form("ollama_investigation_qa_form"):
-            question = st.text_input(
-                "詢問本次調查",
-                placeholder="例如：為什麼這個假設被支持？接下來還應檢查什麼？",
-            )
-            submitted = st.form_submit_button(
-                "詢問本機模型",
-                icon=":material/question_answer:",
-            )
-        if submitted:
-            try:
-                with st.spinner("Ollama 正在根據調查證據回答..."):
-                    answer = OllamaInvestigationQA().answer(question, result.run)
-            except (OllamaError, ValueError) as error:
-                st.error(f"本機問答失敗，正式調查結果不受影響：{error}")
-            else:
-                st.session_state["ollama_case_answer"] = (result.case_id, answer)
+def _render_copilot_answer(
+    answer: InvestigationAnswer,
+    result: BenchmarkCaseResult,
+    *,
+    intent: str,
+) -> None:
+    st.write(answer.answer)
+    st.caption(f"問題類型：{intent} · 模型：{answer.model}")
+    if answer.grounding_facts:
+        st.markdown("**程式整理的可驗證依據**")
+        for fact in answer.grounding_facts:
+            st.markdown(f"- {fact}")
+    if answer.next_checks:
+        st.markdown("**建議的下一步檢查（尚未執行）**")
+        for item in answer.next_checks:
+            st.markdown(f"- {item.action}：{item.reason}")
+    if answer.limitations:
+        st.markdown("**限制**")
+        for limitation in answer.limitations:
+            st.markdown(f"- {limitation}")
 
-        stored = st.session_state.get("ollama_case_answer")
-        if not isinstance(stored, tuple) or len(stored) != 2 or stored[0] != result.case_id:
-            return
-        answer = stored[1]
-        st.markdown("##### 模型說明")
-        st.write(answer.answer)
+    packet = build_investigation_packet(result.run)
+    cited_observations = [
+        item
+        for item in packet["observations"]
+        if item["id"] in answer.observation_ids
+    ]
+    cited_evidence = [
+        item
+        for item in packet["evidence"]
+        if item["id"] in answer.evidence_ids
+    ]
+    with st.expander("查看程式驗證的引用紀錄", expanded=False):
         st.caption(
-            f"模型：{answer.model} · 引用 Observation："
-            f"{', '.join(answer.observation_ids)} · 引用 Evidence："
-            f"{', '.join(answer.evidence_ids) or '無'}"
+            "模型文字仍可能誤讀；以下內容由程式依 ID 直接取自本次 run。"
         )
-        st.warning(
-            "模型說明仍可能誤讀資料；請以下方由程式直接取出的引用紀錄為準。"
-        )
-        packet = build_investigation_packet(result.run)
-        cited_observations = [
-            item
-            for item in packet["observations"]
-            if item["id"] in answer.observation_ids
-        ]
-        cited_evidence = [
-            item
-            for item in packet["evidence"]
-            if item["id"] in answer.evidence_ids
-        ]
         if cited_observations:
-            st.markdown("##### 程式驗證的 Observation 引用")
+            st.markdown("**Observation**")
             st.dataframe(cited_observations, hide_index=True, width="stretch")
+        else:
+            st.info("這則回答沒有引用 Observation。")
         if cited_evidence:
-            st.markdown("##### 程式驗證的 Evidence 引用")
+            st.markdown("**Evidence**")
             st.dataframe(cited_evidence, hide_index=True, width="stretch")
-        if answer.next_checks:
-            st.markdown("##### 建議的下一步檢查（尚未執行）")
-            st.dataframe(
-                [asdict(item) for item in answer.next_checks],
-                hide_index=True,
-                width="stretch",
-            )
-        if answer.limitations:
-            st.markdown("##### 限制")
-            for limitation in answer.limitations:
-                st.markdown(f"- {limitation}")
+        else:
+            st.info("這則回答沒有引用正式 Evidence。")
+
+
+def _render_local_investigation_qa(result: BenchmarkCaseResult) -> None:
+    """Append an optional, case-scoped conversational copilot."""
+    st.divider()
+    st.subheader("本機 Ollama 調查對話")
+    st.caption(
+        "可以連續追問摘要、假設支持／排除、Evidence、安全審查與下一步。"
+        "回答不會改寫正式結果，也不會執行 Tool。"
+    )
+    st.caption(
+        "示例：先問「為什麼支持設定漂移？」再追問「那為什麼不是感測器過期？」"
+    )
+
+    history_key = f"ollama_chat_history::{result.case_id}"
+    history = st.session_state.setdefault(history_key, [])
+    if not isinstance(history, list):
+        history = []
+        st.session_state[history_key] = history
+
+    if st.button(
+        "清除本案例對話",
+        key=f"clear_ollama_chat::{result.case_id}",
+        icon=":material/delete_sweep:",
+        disabled=not history,
+    ):
+        st.session_state[history_key] = []
+        st.rerun()
+
+    for message in history:
+        role = message.get("role")
+        if role not in {"user", "assistant"}:
+            continue
+        with st.chat_message(role):
+            answer = message.get("answer")
+            if role == "assistant" and isinstance(answer, InvestigationAnswer):
+                _render_copilot_answer(
+                    answer,
+                    result,
+                    intent=str(message.get("intent", "general")),
+                )
+            else:
+                st.write(str(message.get("content", "")))
+
+    question = st.chat_input(
+        "詢問這次調查，或接續上一題追問…",
+        key=f"ollama_chat_input::{result.case_id}",
+        max_chars=1000,
+    )
+    if not question:
+        return
+
+    prior_turns = tuple(
+        ConversationTurn(
+            role=str(message["role"]),
+            content=str(message["content"]),
+        )
+        for message in history
+        if message.get("role") in {"user", "assistant"}
+        and isinstance(message.get("content"), str)
+        and message["content"].strip()
+    )
+    user_message = {"role": "user", "content": question}
+    history.append(user_message)
+    with st.chat_message("user"):
+        st.write(question)
+
+    intent = classify_question(question).value
+    with st.chat_message("assistant"):
+        try:
+            with st.spinner("Ollama 正在根據相關調查證據回答..."):
+                answer = OllamaInvestigationQA().answer(
+                    question,
+                    result.run,
+                    history=prior_turns,
+                )
+        except (OllamaError, ValueError) as error:
+            st.error(f"本機問答失敗，正式調查結果不受影響：{error}")
+        else:
+            assistant_message = {
+                "role": "assistant",
+                "content": answer.answer,
+                "intent": intent,
+                "answer": answer,
+            }
+            history.append(assistant_message)
+            _render_copilot_answer(answer, result, intent=intent)
 
 
 def _metric_grid(metrics) -> None:

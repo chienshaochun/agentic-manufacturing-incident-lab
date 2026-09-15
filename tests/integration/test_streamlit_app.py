@@ -57,7 +57,37 @@ def test_app_loads_incident_workbench_without_running_case() -> None:
     assert any(expander.label == "技術與稽核資料（JSON）" for expander in app.expander)
     assert any("請選擇症狀與模擬批次" in info.value for info in app.info)
     assert any("answer key 在調查期間對 Agent 隱藏" in caption.value for caption in app.caption)
-    assert any("介面版本：Progressive Disclosure UI v1" in caption.value for caption in app.caption)
+    assert any("介面版本：Local Ollama Enhancement v1" in caption.value for caption in app.caption)
+
+
+def test_local_ollama_mode_only_adds_collapsed_optional_sections(monkeypatch) -> None:
+    monkeypatch.setenv("INCIDENT_LAB_ENABLE_OLLAMA", "1")
+    app = load_app()
+
+    assert not app.exception
+    assert any(
+        expander.label == "本機 Ollama 輔助填表（選用）"
+        for expander in app.expander
+    )
+    assert any(
+        button.label == "使用 Ollama 解析異常描述"
+        for button in app.button
+    )
+    assert any("本機 Ollama 增強模式" in success.value for success in app.success)
+
+    confirm = next(
+        button
+        for button in app.button
+        if button.label == "確認並執行調查 Confirm & run"
+    )
+    confirm.click().run()
+
+    assert not app.exception
+    assert any(
+        expander.label == "本機 Ollama 調查問答（選用）"
+        for expander in app.expander
+    )
+    assert any(text_input.label == "詢問本次調查" for text_input in app.text_input)
 
 
 def test_run_button_executes_default_case_and_displays_metrics() -> None:

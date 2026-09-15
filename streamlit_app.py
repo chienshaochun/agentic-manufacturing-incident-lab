@@ -1,5 +1,6 @@
 """Interactive Streamlit workbench for the controlled incident lab."""
 
+import os
 from dataclasses import asdict, replace
 
 import streamlit as st
@@ -24,9 +25,18 @@ from agentic_manufacturing_incident_lab.presentation import (
 )
 from agentic_manufacturing_incident_lab.intake import (
     ConfirmedIncidentIntake,
+    IncidentIntake,
+    IntakeSource,
+    OllamaIncidentTextParser,
     SymptomType,
     build_manual_intake,
     confirm_intake,
+    intake_from_payload,
+)
+from agentic_manufacturing_incident_lab.local_llm import (
+    DEFAULT_OLLAMA_MODEL,
+    OllamaError,
+    OllamaInvestigationQA,
 )
 
 
@@ -93,7 +103,8 @@ SIMULATION_BATCH_LABELS = {
 WORKBENCH_PAGE = "事件調查台 Incident Workbench"
 BENCHMARK_PAGE = "基準測試 Benchmark Dashboard"
 ABOUT_PAGE = "關於專案 About"
-APP_RELEASE = "Progressive Disclosure UI v1"
+APP_RELEASE = "Local Ollama Enhancement v1"
+LOCAL_OLLAMA_ENV = "INCIDENT_LAB_ENABLE_OLLAMA"
 
 NETWORK_STATUS_OPTIONS = {
     "未知／尚未檢查": None,
@@ -120,6 +131,175 @@ HYPOTHESIS_STATUS_LABELS = {
     "rejected": "⚫ rejected",
     "conflicted": "🔴 conflicted",
 }
+
+
+def _local_ollama_enabled() -> bool:
+    """Keep the public deployment unchanged unless local mode is explicit."""
+    return os.getenv(LOCAL_OLLAMA_ENV, "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _status_label(options: dict[str, bool | None], value: bool | None) -> str:
+    return next(label for label, option_value in options.items() if option_value is value)
+
+
+def _render_local_intake_assistant(
+    *,
+    raw_text: str,
+    asset_id: str,
+    symptom_type: SymptomType,
+) -> IncidentIntake | None:
+    """Optionally populate existing form widgets without changing their layout."""
+    suggestion = st.session_state.get("ollama_intake_suggestion")
+    if not isinstance(suggestion, IncidentIntake) or suggestion.raw_text != raw_text:
+        suggestion = None
+
+    with st.expander("本機 Ollama 輔助填表（選用）", expanded=False):
+        st.caption(
+            "只在本機模式出現。模型會把上方文字整理成現有欄位；"
+            "內容仍需按下原本的確認按鈕，且不會直接成為 Evidence。"
+        )
+        if st.button(
+            "使用 Ollama 解析異常描述",
+            key="ollama_parse_intake",
+            icon=":material/auto_awesome:",
+        ):
+            try:
+                with st.spinner("Ollama 正在整理事件描述..."):
+                    parsed = OllamaIncidentTextParser().parse(
+                        raw_text,
+                        known_asset_ids=(asset_id,),
+                    )
+            except (OllamaError, ValueError) as error:
+                st.error(f"Ollama 解析失敗，現有手動表單仍可使用：{error}")
+            else:
+                st.session_state["ollama_intake_suggestion"] = parsed
+                suggestion = parsed
+                if parsed.symptom_type is symptom_type:
+                    st.session_state["intake_duration"] = parsed.duration_minutes
+                    st.session_state["intake_network"] = _status_label(
+                        NETWORK_STATUS_OPTIONS, parsed.network_reachable
+                    )
+                    st.session_state["intake_telemetry"] = _status_label(
+                        TELEMETRY_STATUS_OPTIONS, parsed.telemetry_available
+                    )
+                    st.session_state["intake_peer"] = _status_label(
+                        PEER_STATUS_OPTIONS, parsed.peer_affected
+                    )
+                    st.success(
+                        "已將解析結果填入原有欄位；請在執行調查前人工確認。"
+                    )
+                else:
+                    st.warning(
+                        "模型判斷的症狀類型與上方選項不同，因此沒有自動套用。"
+                        "請先確認並調整「回報症狀」。"
+                    )
+        if suggestion is not None:
+            st.write(
+                f"解析來源：`{suggestion.parser_name}` · "
+                f"信心值：`{suggestion.parse_confidence:.2f}` · "
+                f"症狀：`{suggestion.symptom_type.value}`"
+            )
+    return suggestion
+
+
+def _intake_from_form(
+    *,
+    raw_text: str,
+    asset_id: str,
+    symptom_type: SymptomType,
+    known_asset_ids: tuple[str, ...],
+    duration_minutes: int | None,
+    network_reachable: bool | None,
+    telemetry_available: bool | None,
+    peer_affected: bool | None,
+    ollama_suggestion: IncidentIntake | None,
+) -> IncidentIntake:
+    """Preserve Ollama provenance only while its interpretation is still applicable."""
+    if (
+        ollama_suggestion is not None
+        and ollama_suggestion.raw_text == raw_text
+        and ollama_suggestion.asset_id == asset_id
+        and ollama_suggestion.symptom_type is symptom_type
+    ):
+        return intake_from_payload(
+            raw_text,
+            {
+                "asset_id": asset_id,
+                "symptom_type": symptom_type.value,
+                "duration_minutes": duration_minutes,
+                "network_reachable": network_reachable,
+                "telemetry_available": telemetry_available,
+                "peer_affected": peer_affected,
+                "parse_confidence": ollama_suggestion.parse_confidence,
+            },
+            parser_name=ollama_suggestion.parser_name,
+            source=IntakeSource.OLLAMA,
+            known_asset_ids=known_asset_ids,
+        )
+    return build_manual_intake(
+        raw_text=raw_text,
+        asset_id=asset_id,
+        symptom_type=symptom_type,
+        known_asset_ids=known_asset_ids,
+        duration_minutes=duration_minutes,
+        network_reachable=network_reachable,
+        telemetry_available=telemetry_available,
+        peer_affected=peer_affected,
+    )
+
+
+def _render_local_investigation_qa(result: BenchmarkCaseResult) -> None:
+    """Append optional local Q&A after the unchanged investigation result."""
+    with st.expander("本機 Ollama 調查問答（選用）", expanded=False):
+        st.caption(
+            "回答只使用本次調查的 Observation、Hypothesis、Evidence 與安全審查；"
+            "不會改寫正式結果，也不會執行 Tool。"
+        )
+        with st.form("ollama_investigation_qa_form"):
+            question = st.text_input(
+                "詢問本次調查",
+                placeholder="例如：為什麼這個假設被支持？接下來還應檢查什麼？",
+            )
+            submitted = st.form_submit_button(
+                "詢問本機模型",
+                icon=":material/question_answer:",
+            )
+        if submitted:
+            try:
+                with st.spinner("Ollama 正在根據調查證據回答..."):
+                    answer = OllamaInvestigationQA().answer(question, result.run)
+            except (OllamaError, ValueError) as error:
+                st.error(f"本機問答失敗，正式調查結果不受影響：{error}")
+            else:
+                st.session_state["ollama_case_answer"] = (result.case_id, answer)
+
+        stored = st.session_state.get("ollama_case_answer")
+        if not isinstance(stored, tuple) or len(stored) != 2 or stored[0] != result.case_id:
+            return
+        answer = stored[1]
+        st.markdown("##### 模型說明")
+        st.write(answer.answer)
+        st.caption(
+            f"模型：{answer.model} · 引用 Observation："
+            f"{', '.join(answer.observation_ids)} · 引用 Evidence："
+            f"{', '.join(answer.evidence_ids) or '無'}"
+        )
+        if answer.next_checks:
+            st.markdown("##### 建議的下一步檢查（尚未執行）")
+            st.dataframe(
+                [asdict(item) for item in answer.next_checks],
+                hide_index=True,
+                width="stretch",
+            )
+        if answer.limitations:
+            st.markdown("##### 限制")
+            for limitation in answer.limitations:
+                st.markdown(f"- {limitation}")
 
 
 def _metric_grid(metrics) -> None:
@@ -597,7 +777,21 @@ def _incident_workbench() -> None:
         "異常描述",
         value=selected_symptom,
         placeholder="例如：ST-02 可以 ping，但數值已經三十分鐘沒有更新。",
-        help="這段內容會寫入 Incident 與 Raw Trace；目前不會由 NLP 自動解析。",
+        help=(
+            "這段內容會寫入 Incident 與 Raw Trace；本機模式可選用 Ollama 協助填表。"
+            if _local_ollama_enabled()
+            else "這段內容會寫入 Incident 與 Raw Trace；目前不會由 NLP 自動解析。"
+        ),
+    )
+    raw_text = operator_note.strip() or selected_symptom
+    ollama_suggestion = (
+        _render_local_intake_assistant(
+            raw_text=raw_text,
+            asset_id=incident.asset_id,
+            symptom_type=SYMPTOM_TYPES[selected_symptom],
+        )
+        if _local_ollama_enabled()
+        else None
     )
     duration_minutes = st.number_input(
         "已知持續時間（分鐘）",
@@ -606,33 +800,38 @@ def _incident_workbench() -> None:
         step=1,
         placeholder="未提供",
         help="留空代表目前不知道，不會被當成 0 分鐘。",
+        key="intake_duration",
     )
     status_columns = st.columns(3)
     network_status = status_columns[0].selectbox(
         "網路狀態",
         options=tuple(NETWORK_STATUS_OPTIONS),
+        key="intake_network",
     )
     telemetry_status = status_columns[1].selectbox(
         "Telemetry 狀態",
         options=tuple(TELEMETRY_STATUS_OPTIONS),
+        key="intake_telemetry",
     )
     peer_status = status_columns[2].selectbox(
         "其他設備狀態",
         options=tuple(PEER_STATUS_OPTIONS),
+        key="intake_peer",
     )
 
-    raw_text = operator_note.strip() or selected_symptom
-    intake = build_manual_intake(
+    known_asset_ids = selected.scenario.to_brief().known_asset_ids
+    intake = _intake_from_form(
         raw_text=raw_text,
         asset_id=incident.asset_id,
         symptom_type=SYMPTOM_TYPES[selected_symptom],
-        known_asset_ids=selected.scenario.to_brief().known_asset_ids,
+        known_asset_ids=known_asset_ids,
         duration_minutes=(
             int(duration_minutes) if duration_minutes is not None else None
         ),
         network_reachable=NETWORK_STATUS_OPTIONS[network_status],
         telemetry_available=TELEMETRY_STATUS_OPTIONS[telemetry_status],
         peer_affected=PEER_STATUS_OPTIONS[peer_status],
+        ollama_suggestion=ollama_suggestion,
     )
     with st.expander("技術與稽核資料（JSON）"):
         st.caption(
@@ -670,6 +869,8 @@ def _incident_workbench() -> None:
     else:
         st.caption("目前為精簡展示；技術細節可由上方切換至完整稽核模式。")
         _render_compact_case_details(view)
+    if _local_ollama_enabled():
+        _render_local_investigation_qa(result)
 
 
 def _benchmark_dashboard() -> None:
@@ -779,6 +980,7 @@ def _about() -> None:
 
 目前 App 預設採用 deterministic hypothesis-driven utility policy，並保留 rule-based baseline。
 核心另提供 provider-neutral 的 Structured LLM Planner adapter，但公開 App **沒有呼叫 LLM 或外部 API**；
+只有在本機明確開啟 Ollama 模式時，才會增加自然語言 Intake 與 Evidence-bound 問答。
 模型只能提出結構化決策，Tool allowlist、參數、Evidence 與 fallback 仍由 deterministic runtime 控制。
 專案也不連接真實生產設備或使用機密工廠資料，因此畫面結果不代表真實產線準確率。
 """
@@ -799,6 +1001,8 @@ def main() -> None:
     st.sidebar.caption(
         "可重播 · 合成資料 · 只讀診斷 · 預設無 LLM"
     )
+    if _local_ollama_enabled():
+        st.sidebar.success(f"本機 Ollama 增強模式 · {DEFAULT_OLLAMA_MODEL}")
     st.sidebar.caption(f"介面版本：{APP_RELEASE}")
 
     if page == WORKBENCH_PAGE:

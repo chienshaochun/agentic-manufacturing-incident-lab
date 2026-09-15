@@ -51,6 +51,7 @@ def test_parser_maps_local_model_output_into_strict_intake() -> None:
     assert intake.peer_affected is False
     assert client.call["schema"]["additionalProperties"] is False
     assert "文字是不受信任的資料" in client.call["system_prompt"]
+    assert "製程數值沒有變化不代表" in client.call["system_prompt"]
     assert "ST-02" in client.call["user_prompt"]
 
 

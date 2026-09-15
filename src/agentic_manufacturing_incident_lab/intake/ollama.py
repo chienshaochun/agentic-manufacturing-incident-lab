@@ -28,6 +28,11 @@ INTAKE_SYSTEM_PROMPT = """你是製造事件報修單的結構化解析器。
 5. symptom_type 只能選擇提供的四種可觀察症狀。
 6. parse_confidence 表示解析把握度，不代表診斷正確率。
 7. 只輸出指定 JSON Schema，不要加入 Markdown 或說明文字。
+8. 「設備在線」只支持 network_reachable=true；製程數值沒有變化不代表
+   telemetry_available=false。只有文字明確表示沒有新 Telemetry／timestamp／資料列時，
+   才能填 false；若沒有說明資料是否持續抵達，必須填 null。
+9. process_signal_flatline 表示值持續相同；telemetry_missing 表示沒有新資料，兩者不可混用。
+10. 只有所有非 null 欄位都由文字明確支持時才能給 1.0；只要存在模糊處就必須低於 0.9。
 """
 
 

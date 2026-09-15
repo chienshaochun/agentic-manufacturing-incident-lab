@@ -84,10 +84,15 @@ def test_local_ollama_mode_only_adds_collapsed_optional_sections(monkeypatch) ->
 
     assert not app.exception
     assert any(
-        expander.label == "本機 Ollama 調查問答（選用）"
-        for expander in app.expander
+        subheader.value == "本機 Ollama 調查對話"
+        for subheader in app.subheader
     )
-    assert any(text_input.label == "詢問本次調查" for text_input in app.text_input)
+    assert len(app.chat_input) == 1
+    assert app.chat_input[0].placeholder == "詢問這次調查，或接續上一題追問…"
+    assert any(
+        button.label == "清除本案例對話" and button.disabled
+        for button in app.button
+    )
 
 
 def test_run_button_executes_default_case_and_displays_metrics() -> None:

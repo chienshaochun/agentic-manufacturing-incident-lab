@@ -204,14 +204,15 @@ def select_grounded_context(
         ]
         if matching_evidence:
             selected_evidence = matching_evidence
-    for item in selected_evidence:
-        if not isinstance(item, dict):
-            continue
-        selected_observation_ids.update(
-            observation_id
-            for observation_id in item.get("observation_ids", [])
-            if isinstance(observation_id, str) and observation_id in observations
-        )
+    if intent not in {QuestionIntent.SUPPORT, QuestionIntent.REJECTION}:
+        for item in selected_evidence:
+            if not isinstance(item, dict):
+                continue
+            selected_observation_ids.update(
+                observation_id
+                for observation_id in item.get("observation_ids", [])
+                if isinstance(observation_id, str) and observation_id in observations
+            )
 
     if intent in {QuestionIntent.SUMMARY, QuestionIntent.SAFETY, QuestionIntent.GENERAL}:
         selected_observation_ids.update(observations)

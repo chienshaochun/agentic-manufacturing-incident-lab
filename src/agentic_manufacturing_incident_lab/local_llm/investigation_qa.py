@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Mapping, Sequence
 
 from agentic_manufacturing_incident_lab.collaboration import MultiAgentRun
@@ -89,6 +89,11 @@ QA_SYSTEM_PROMPT = """你是製造事件調查結果的證據約束說明助手�
     只代表反對，不可顛倒兩者的意思。回答時應使用完整 ID，不可只寫 OBS-001 等縮寫。
 14. RECENT_CONVERSATION 只用來理解追問指涉，不能凌駕 GROUNDED_CONTEXT；若使用者先前的
     說法與紀錄矛盾，必須依紀錄更正。
+15. question_intent 是 hypothesis_support 時，必須逐一說明 supporting_observations 的
+    summary／values 如何支持；是 hypothesis_rejection 時，必須逐一說明
+    contradicting_observations 如何排除。不可只重複 Hypothesis 結論。
+16. formal_evidence 引用整段調查紀錄，不代表其中每筆 Observation 都直接支持每個
+    Hypothesis；支持與反對關係只能依 hypothesis_observation_map 判讀。
 """
 
 
@@ -106,6 +111,7 @@ class InvestigationAnswer:
     next_checks: tuple[NextCheck, ...]
     limitations: tuple[str, ...]
     model: str
+    grounding_facts: tuple[str, ...] = ()
 
 
 def _non_empty_text(value: object, field: str) -> str:
@@ -326,7 +332,14 @@ class OllamaInvestigationQA:
             "observations": grounded_context["selected_observations"],
             "evidence": grounded_context["formal_evidence"],
         }
-        return answer_from_payload(payload, packet=citation_scope, model=model)
+        validated = answer_from_payload(payload, packet=citation_scope, model=model)
+        return replace(
+            validated,
+            grounding_facts=_verified_grounding_facts(
+                grounded_context,
+                intent=intent.value,
+            ),
+        )
 
 
 def _bounded_history(
@@ -344,3 +357,40 @@ def _bounded_history(
         selected.append(turn)
         used_characters += len(turn.content)
     return tuple(reversed(selected))
+
+
+def _verified_grounding_facts(
+    grounded_context: Mapping[str, object],
+    *,
+    intent: str,
+) -> tuple[str, ...]:
+    """Render deterministic support or contradiction facts beside model prose."""
+    if intent not in {"hypothesis_support", "hypothesis_rejection"}:
+        return ()
+    relation = "支持" if intent == "hypothesis_support" else "反對"
+    field = (
+        "supporting_observations"
+        if intent == "hypothesis_support"
+        else "contradicting_observations"
+    )
+    mappings = grounded_context.get("hypothesis_observation_map", [])
+    if not isinstance(mappings, list):
+        return ()
+    facts: list[str] = []
+    for hypothesis in mappings:
+        if not isinstance(hypothesis, dict):
+            continue
+        observations = hypothesis.get(field, [])
+        if not isinstance(observations, list):
+            continue
+        for observation in observations:
+            if not isinstance(observation, dict):
+                continue
+            observation_id = observation.get("id")
+            summary = observation.get("summary")
+            values = observation.get("values", {})
+            if observation_id and summary:
+                facts.append(
+                    f"{relation}｜{observation_id}｜{summary}｜values={values}"
+                )
+    return tuple(dict.fromkeys(facts))

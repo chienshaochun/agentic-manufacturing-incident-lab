@@ -265,6 +265,10 @@ def _render_copilot_answer(
 ) -> None:
     st.write(answer.answer)
     st.caption(f"問題類型：{intent} · 模型：{answer.model}")
+    if answer.grounding_facts:
+        st.markdown("**程式整理的可驗證依據**")
+        for fact in answer.grounding_facts:
+            st.markdown(f"- {fact}")
     if answer.next_checks:
         st.markdown("**建議的下一步檢查（尚未執行）**")
         for item in answer.next_checks:

@@ -55,6 +55,10 @@ def test_support_question_selects_exact_supporting_observations() -> None:
         "INC-SIGNAL-0118-OBS-004",
     ]
     assert hypothesis["contradicting_observations"] == []
+    assert [item["id"] for item in context["selected_observations"]] == [
+        "INC-SIGNAL-0118-OBS-001",
+        "INC-SIGNAL-0118-OBS-004",
+    ]
 
 
 def test_rejection_question_selects_sensor_contradiction_only() -> None:
@@ -69,6 +73,9 @@ def test_rejection_question_selects_sensor_contradiction_only() -> None:
     assert hypotheses[0]["status"] == "rejected"
     assert "感測器資料已過期" in hypotheses[0]["statement"]
     assert [item["id"] for item in hypotheses[0]["contradicting_observations"]] == [
+        "INC-SIGNAL-0118-OBS-006"
+    ]
+    assert [item["id"] for item in context["selected_observations"]] == [
         "INC-SIGNAL-0118-OBS-006"
     ]
 

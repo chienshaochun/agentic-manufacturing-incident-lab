@@ -5,6 +5,7 @@ from agentic_manufacturing_incident_lab.evaluation import (
     run_benchmark_case,
 )
 from agentic_manufacturing_incident_lab.local_llm import (
+    ConversationTurn,
     OllamaInvestigationQA,
     OllamaResponseError,
     answer_from_payload,
@@ -72,6 +73,45 @@ def test_qa_returns_validated_cited_answer() -> None:
     assert "不可無理由重複" in client.call["system_prompt"]
     assert "quality_factor 小於 0.8" in client.call["system_prompt"]
     assert "INC-CONNECTIVITY-0043" in client.call["user_prompt"]
+
+
+def test_qa_passes_bounded_history_and_rejection_context() -> None:
+    run = completed_run()
+    packet = build_investigation_packet(run)
+    rejected = next(
+        item for item in packet["hypotheses"] if item["status"] == "rejected"
+    )
+    observation_id = rejected["contradicting_observation_ids"][0]
+    payload = valid_answer(run) | {
+        "observation_ids": [observation_id],
+        "evidence_ids": [],
+    }
+    client = FakeClient(payload)
+    provider = OllamaInvestigationQA(client=client)  # type: ignore[arg-type]
+
+    provider.answer(
+        "那為什麼不是共用網路？",
+        run,
+        history=(
+            ConversationTurn("user", "目前主要結論是什麼？"),
+            ConversationTurn("assistant", "故障隔離在 ST-02。"),
+        ),
+    )
+
+    prompt = client.call["user_prompt"]
+    assert '"question_intent": "hypothesis_rejection"' in prompt
+    assert '"role": "assistant"' in prompt
+    assert observation_id in prompt
+    assert "supporting_observations" in prompt
+    assert "contradicting_observations" in prompt
+
+
+def test_qa_rejects_history_values_outside_conversation_contract() -> None:
+    run = completed_run()
+    provider = OllamaInvestigationQA(client=FakeClient(valid_answer(run)))  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match="ConversationTurn"):
+        provider.answer("發生什麼？", run, history=("invalid",))  # type: ignore[arg-type]
 
 
 def test_answer_rejects_unknown_observation_or_evidence_id() -> None:

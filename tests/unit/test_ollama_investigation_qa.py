@@ -117,6 +117,24 @@ def test_qa_rejects_history_values_outside_conversation_contract() -> None:
         provider.answer("發生什麼？", run, history=("invalid",))  # type: ignore[arg-type]
 
 
+def test_qa_keeps_six_recent_question_answer_pairs() -> None:
+    run = completed_run()
+    client = FakeClient(valid_answer(run))
+    provider = OllamaInvestigationQA(client=client)  # type: ignore[arg-type]
+    history = tuple(
+        ConversationTurn("user" if index % 2 == 0 else "assistant", f"message-{index}")
+        for index in range(14)
+    )
+
+    provider.answer("為什麼判斷是單一設備問題？", run, history=history)
+
+    prompt = client.call["user_prompt"]
+    assert '"content": "message-0"' not in prompt
+    assert '"content": "message-1"' not in prompt
+    assert '"content": "message-2"' in prompt
+    assert '"content": "message-13"' in prompt
+
+
 def test_answer_rejects_unknown_observation_or_evidence_id() -> None:
     run = completed_run()
     packet = build_investigation_packet(run)

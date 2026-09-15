@@ -21,7 +21,7 @@ from agentic_manufacturing_incident_lab.presentation.localization import localiz
 
 MAX_QUESTION_LENGTH = 1000
 MAX_NEXT_CHECKS = 5
-MAX_HISTORY_TURNS = 6
+MAX_HISTORY_MESSAGES = 12
 MAX_HISTORY_CHARACTERS = 6000
 
 ANSWER_SCHEMA: dict[str, object] = {
@@ -351,7 +351,7 @@ def _bounded_history(
         raise ValueError("history must contain ConversationTurn values")
     selected: list[ConversationTurn] = []
     used_characters = 0
-    for turn in reversed(turns[-MAX_HISTORY_TURNS:]):
+    for turn in reversed(turns[-MAX_HISTORY_MESSAGES:]):
         if used_characters + len(turn.content) > MAX_HISTORY_CHARACTERS:
             break
         selected.append(turn)

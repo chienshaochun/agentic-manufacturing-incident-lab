@@ -40,6 +40,7 @@
 - 症狀導向輸入、Hypothesis 演化與 Planner 候選決策可視化
 - 可替換文字 Parser 的嚴格 Incident Intake 契約與人工確認閘門
 - 選用的本機 Ollama 自然語言 Intake 與 Evidence-bound 調查問答
+- 具意圖路由、案例隔離與可驗證引用的多輪 Investigation Copilot
 
 詳細邊界與驗收條件見 [產品契約](docs/PRODUCT_CONTRACT.md)，逐步實作方式見 [學習路線圖](docs/LEARNING_ROADMAP.md)，Phase 1 的資料關係見 [領域模型](docs/DOMAIN_MODEL.md)，Phase 2 的執行架構見 [模擬環境與工具系統](docs/PHASE_2_SIMULATOR_AND_TOOLS.md)，Phase 3 的決策流程見 [單一 Agent 決策循環](docs/PHASE_3_SINGLE_AGENT_LOOP.md)，Phase 4 的恢復架構見 [工作記憶與 Checkpoint](docs/PHASE_4_MEMORY_AND_CHECKPOINTS.md)，Phase 5 的安全邊界見 [批准、安全與故障恢復](docs/PHASE_5_SAFETY_AND_RECOVERY.md)，Phase 6 的角色分工見 [多 Agent 協作與比較](docs/PHASE_6_MULTI_AGENT_COLLABORATION.md)，Phase 7 的量化驗證見 [評估、故障注入與可觀測性](docs/PHASE_7_EVALUATION_AND_OBSERVABILITY.md)，Phase 8 的完整操作方式見 [Streamlit 事件調查操作台](docs/PHASE_8_STREAMLIT_WORKBENCH.md)，Phase 9 的假設推理見 [Hypothesis Engine](docs/PHASE_9_HYPOTHESIS_ENGINE.md)，Phase 10 的決策方式見 [動態工具選擇](docs/PHASE_10_DYNAMIC_TOOL_SELECTION.md)，Phase 11 的跨來源案例見 [多來源製造診斷情境](docs/PHASE_11_REALISTIC_MANUFACTURING_SCENARIOS.md)，Phase 12 的模型邊界見 [結構化 LLM Planner](docs/PHASE_12_STRUCTURED_LLM_ADAPTER.md)，Phase 13 的驗證方式見 [Agent 能力評估與 Planner A/B](docs/PHASE_13_AGENT_EVALUATION.md)。
 
@@ -51,9 +52,11 @@ Phase 16 的模型接入前置設計見 [結構化 Incident Intake](docs/PHASE_1
 
 Phase 17 的本機模型邊界與操作方式見 [本機 Ollama 自然語言增強](docs/PHASE_17_LOCAL_OLLAMA.md)。
 
+Phase 18 的多輪對話與 Hybrid grounding 見 [多輪 Investigation Copilot](docs/PHASE_18_CONVERSATIONAL_COPILOT.md)。
+
 ## 目前進度
 
-Phase 17 已完成：公開版維持原有 deterministic UI 與 16 個受控案例；本機明確開啟 Ollama 模式後，操作員可用 Qwen 協助把自由文字填入既有 Intake 欄位，調查完成後也可針對本次 Observation、Hypothesis、Evidence 與 Safety Review 進行自然語言追問。模型輸出必須通過 Schema 與 ID 引用驗證，而且不會改寫正式調查結果或執行 Tool。
+Phase 18 已完成：公開版維持原有 deterministic UI 與 16 個受控案例；本機模式將單次問答升級為多輪 Investigation Copilot。系統會先分類問題、選取相關 Hypothesis 與 Observation，再把最近 6 輪對話交給 Qwen。模型輸出必須通過 Schema 與本題引用範圍驗證，支援／反對關係另由 Python 產生可驗證依據；聊天不會改寫正式調查或執行 Tool。
 
 ## 本機手動演練
 

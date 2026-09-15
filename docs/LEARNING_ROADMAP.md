@@ -122,6 +122,14 @@
 
 完成狀態：已完成；見 [Phase 17 說明](PHASE_17_LOCAL_OLLAMA.md)。
 
+## Phase 18：多輪 Hybrid Investigation Copilot
+
+把單次 Evidence-bound 問答升級為案例隔離的 Streamlit chat。透過 deterministic intent router 與 entity-aware context selector，先找出本題真正相關的支持／反對 Observation，再加入最近 6 輪對話供本機模型理解追問。回答仍需通過 ID 驗證，且由 Python 額外呈現不可被模型改寫的證據關係。
+
+物理意義：工程師可以持續和助理討論同一張調查白板；聊天記憶協助理解「它」指的是什麼，但每個技術回答都必須重新指向白板上的原始量測紀錄。
+
+完成狀態：已完成；見 [Phase 18 說明](PHASE_18_CONVERSATIONAL_COPILOT.md)。
+
 ## 技術採用順序
 
 - 核心先使用 Python 3.12 與標準函式庫，保持行為透明。

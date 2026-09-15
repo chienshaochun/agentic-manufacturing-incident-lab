@@ -107,7 +107,7 @@ SIMULATION_BATCH_LABELS = {
 WORKBENCH_PAGE = "事件調查台 Incident Workbench"
 BENCHMARK_PAGE = "基準測試 Benchmark Dashboard"
 ABOUT_PAGE = "關於專案 About"
-APP_RELEASE = "Local Ollama Enhancement v1"
+APP_RELEASE = "Conversational Copilot v1"
 LOCAL_OLLAMA_ENV = "INCIDENT_LAB_ENABLE_OLLAMA"
 
 NETWORK_STATUS_OPTIONS = {

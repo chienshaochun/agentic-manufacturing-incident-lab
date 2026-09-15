@@ -57,7 +57,7 @@ def test_app_loads_incident_workbench_without_running_case() -> None:
     assert any(expander.label == "技術與稽核資料（JSON）" for expander in app.expander)
     assert any("請選擇症狀與模擬批次" in info.value for info in app.info)
     assert any("answer key 在調查期間對 Agent 隱藏" in caption.value for caption in app.caption)
-    assert any("介面版本：Local Ollama Enhancement v1" in caption.value for caption in app.caption)
+    assert any("介面版本：Conversational Copilot v1" in caption.value for caption in app.caption)
 
 
 def test_local_ollama_mode_only_adds_collapsed_optional_sections(monkeypatch) -> None:

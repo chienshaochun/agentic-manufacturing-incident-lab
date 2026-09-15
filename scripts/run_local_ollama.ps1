@@ -13,7 +13,8 @@ $installedModels = & ollama list 2>&1
 if ($LASTEXITCODE -ne 0) {
     throw "Ollama is unavailable. Start the local Ollama service first."
 }
-if ($installedModels -notmatch [regex]::Escape($model)) {
+$installedModelText = $installedModels -join [Environment]::NewLine
+if ($installedModelText -notmatch [regex]::Escape($model)) {
     throw "$model is not installed. Run: ollama pull $model"
 }
 
